@@ -157,4 +157,103 @@ DotProduct(v2 Vector1, v2 Vector2)
 }
 
 
+// Vector 3
+
+union v3
+{
+    struct
+    {
+        r32 x, y, z;
+    };
+    r32 E[3];
+};
+
+
+inline v3
+operator*(r32 Scalar, v3 A)
+{
+    v3 Result;
+
+    Result.x = A.x * Scalar;
+    Result.y = A.y * Scalar;
+    Result.z = A.z * Scalar;
+
+    return Result;
+}
+
+
+inline v3
+operator*(v3 A, r32 Scalar)
+{
+    return Scalar * A;
+}
+
+
+inline v3 &
+operator*=(v3 &A, r32 Scalar)
+{
+    A = A * Scalar;
+
+    return A;
+}
+
+
+inline v3
+operator+(v3 A, v3 B)
+{
+    v3 Result;
+
+    Result.x = A.x + B.x;
+    Result.y = A.y + B.y;
+    Result.z = A.z + B.z;
+
+    return Result;
+}
+
+
+inline v3 &
+operator+=(v3 &A, v3 B)
+{
+    A = A + B;
+
+    return A;
+}
+
+
+inline v3
+operator-(v3 A, v3 B)
+{
+    v3 Result;
+
+    Result.x = A.x - B.x;
+    Result.y = A.y - B.y;
+    Result.z = A.z - B.z;
+
+    return Result;
+}
+
+
+inline v3 &
+operator-=(v3 &A, v3 B)
+{
+    A = A - B;
+
+    return A;
+}
+
+
+// Unary
+inline v3
+operator-(v3 A)
+{
+    v3 Result;
+
+    Result.x = -A.x;
+    Result.y = -A.y;
+    Result.z = -A.z;
+
+    return Result;
+}
+
+
 #endif

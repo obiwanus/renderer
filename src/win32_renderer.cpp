@@ -64,6 +64,12 @@ DEBUG_PLATFORM_READ_ENTIRE_FILE(DEBUGPlatformReadEntireFile)
 }
 
 
+CONVERT_BYTES_TO_STRING(ConvertBytesToString)
+{
+    // We assume UTF-8 here
+}
+
+
 internal void
 Win32UpdateWindow(HDC hdc)
 {
@@ -372,7 +378,7 @@ WinMain(HINSTANCE hInstance,
     WindowClass.lpszClassName = "rendererWindowClass";
 
     // TODO: query monitor refresh rate
-    int TargetFPS = 60;
+    int TargetFPS = 10;
     r32 TargetMSPF = 1000.0f / (r32)TargetFPS;  // Target ms per frame
 
     // Set target sleep resolution
@@ -435,6 +441,7 @@ WinMain(HINSTANCE hInstance,
                 GameMemory.IsInitialized = true;
 
                 GameMemory.DEBUGPlatformReadEntireFile = DEBUGPlatformReadEntireFile;
+                GameMemory.ConvertBytesToString = ConvertBytesToString;
                 // GameMemory.DEBUGPlatformWriteEntireFile = DEBUGPlatformWriteEntireFile;
             }
 

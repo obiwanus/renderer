@@ -134,6 +134,9 @@ typedef DEBUG_PLATFORM_READ_ENTIRE_FILE(debug_platform_read_entire_file);
 #define DEBUG_PLATFORM_WRITE_ENTIRE_FILE(name) void name(char *Filename, int FileSize, void *Memory)
 typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE(debug_platform_write_entire_file);
 
+#define CONVERT_BYTES_TO_STRING(name) void name(file_read_result *File, void *string)
+typedef CONVERT_BYTES_TO_STRING(convert_bytes_to_string);
+
 
 struct game_memory
 {
@@ -145,6 +148,7 @@ struct game_memory
     // Debug functions
     debug_platform_read_entire_file *DEBUGPlatformReadEntireFile;
     debug_platform_write_entire_file *DEBUGPlatformWriteEntireFile;
+    convert_bytes_to_string *ConvertBytesToString;
 };
 
 
