@@ -1,15 +1,12 @@
 #include "renderer.h"
 
-// TODO: delete
 #include <windows.h>
 
 
 // These are saved as global vars on the first call of GameUpdateAndRender
 global game_offscreen_buffer *GameBackBuffer;
 global game_memory *GameMemory;
-
-global entity *Players;
-global entity *Ball;
+global model Model;
 
 
 inline int
@@ -41,11 +38,124 @@ GameMemoryAlloc(int SizeInBytes)
 }
 
 
-internal void *
-ReadModelFromFile(char *Filename)
-{
-    file_read_result FileReadResult = GameMemory->DEBUGPlatformReadEntireFile(Filename);
+// Super awesome code below
 
+internal int
+ReadLine(wchar_t *FileData, int i, wchar_t *Result)
+{
+    int j = 0;
+    while (j < 100 && FileData[i+j] != L'\n')
+    {
+        Result[j] = FileData[i+j];
+        j++;
+    }
+
+    Result[j] = 0;
+
+    return i + j + 1;
+}
+
+
+internal int
+ReadWord(wchar_t *Word, wchar_t **Cursor, wchar_t Delimiter)
+{
+    int i = 0;
+    wchar_t *Line = *Cursor;
+
+    while ((*Word++ = *Line++) != Delimiter && i++ < 20)
+    {
+        if (*Line == 0)
+        {
+            *Word = 0;
+            return -1;
+        }
+    }
+    Word--;
+    *Word = 0;
+    *Cursor = Line;
+    return ++i;
+}
+
+
+internal void
+ReadModelFromFile(char *Filename, model *Result)
+{
+    file_read_result FileRead = GameMemory->DEBUGPlatformReadEntireFile(Filename);
+    GameMemory->ConvertBytesToString(FileRead.Memory, (int)FileRead.MemorySize, &Result->File);
+
+    Result->FileCharCount = (int)FileRead.MemorySize;
+
+    wchar_t Line[100];
+    int i = 0;
+
+    // Count faces and vertices
+    while (i < Result->FileCharCount)
+    {
+        i = ReadLine(Result->File, i, Line);
+
+        wchar_t Words[10][20] = {};  // max 10 words 20 symbols long
+        int j = 0;
+        wchar_t *Cursor = Line;
+        while (ReadWord(Words[j++], &Cursor, L' ') != -1)
+            ;
+
+        if (Words[0][0] == L'v' && Words[0][1] == 0)
+        {
+            Result->VertCount++;
+        }
+        else if (Words[0][0] == L'f' && Words[0][1] == 0)
+        {
+            Result->FaceCount++;
+        }
+
+    }
+
+    // Allocate some space (too lazy to calculate)
+    Result->Verts = (v3 *) GameMemoryAlloc((Result->VertCount + 1) * sizeof(v3));
+    Result->Faces = (v3 *) GameMemoryAlloc((Result->FaceCount + 1) * sizeof(v3));
+
+    // Fill faces and vertices
+    i = 0;
+    int vert_i = 0;
+    int face_i = 0;
+    while (i < Result->FileCharCount)
+    {
+        i = ReadLine(Result->File, i, Line);
+
+        wchar_t Words[10][20] = {};  // max 10 words 20 symbols long
+        int j = 0;
+        wchar_t *Cursor = Line;
+        while (ReadWord(Words[j++], &Cursor, L' ') != -1)
+            ;
+
+        if (Words[0][0] == L'v' && Words[0][1] == 0)
+        {
+            v3 *Vertex = &Result->Verts[vert_i++];
+            Vertex->x = (r32)(_wtof(Words[1]) + 1.0f) * GameBackBuffer->Width / 4.0f;
+            Vertex->y = (r32)(_wtof(Words[2]) + 1.0f) * GameBackBuffer->Width / 4.0f;
+            Vertex->z = (r32)(_wtof(Words[3]) + 1.0f) * GameBackBuffer->Width / 4.0f;
+        }
+        else if (Words[0][0] == L'f' && Words[0][1] == 0)
+        {
+            v3 *Face = &Result->Faces[face_i++];
+
+            // Split each word
+            wchar_t FaceWord[10] = {};
+
+            Cursor = Words[1];
+            ReadWord(FaceWord, &Cursor, L'/');
+            Face->x = (r32)_wtof(FaceWord);
+
+            Cursor = Words[2];
+            ReadWord(FaceWord, &Cursor, L'/');
+            Face->y = (r32)_wtof(FaceWord);
+
+            Cursor = Words[3];
+            ReadWord(FaceWord, &Cursor, L'/');
+            Face->z = (r32)_wtof(FaceWord);
+        }
+
+    }
 }
 
 
@@ -108,7 +218,23 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     GameBackBuffer = Buffer;
     GameMemory = Memory;
 
-    DrawLine(-10, -100, 300, 250, 0x00777777);
+    if (!Model.FileCharCount)
+    {
+        ReadModelFromFile("african_head.model", &Model);
+    }
+
+    u32 Color = 0x00777777;
+    for (int i = 0; i < Model.FaceCount; i++)
+    {
+        v3 *Face = &Model.Faces[i];
+
+        v3 *Vert1 = &Model.Verts[(int)Face->x];
+        v3 *Vert2 = &Model.Verts[(int)Face->y];
+        v3 *Vert3 = &Model.Verts[(int)Face->z];
+        DrawLine(Vert1->x, Vert1->y, Vert2->x, Vert2->y, Color);
+        // DrawLine(Vert1->x, Vert1->y, Vert3->x, Vert3->y, Color);
+        // DrawLine(Vert2->x, Vert2->y, Vert3->x, Vert3->y, Color);
+    }
 }
 
 

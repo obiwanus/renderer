@@ -66,7 +66,20 @@ DEBUG_PLATFORM_READ_ENTIRE_FILE(DEBUGPlatformReadEntireFile)
 
 CONVERT_BYTES_TO_STRING(ConvertBytesToString)
 {
+    // void *Source, int SourceSize, wchar_t **ModelString
+
+    // Allocate as many char16 as there are bytes (for safety)
+    *ModelString = (wchar_t *)VirtualAlloc(0, SourceSize * sizeof(wchar_t), MEM_COMMIT, PAGE_READWRITE);
+
     // We assume UTF-8 here
+    MultiByteToWideChar(
+        CP_UTF8,
+        MB_ERR_INVALID_CHARS,
+        (LPCSTR)Source,
+        SourceSize,
+        *ModelString,  // result
+        SourceSize
+    );
 }
 
 
