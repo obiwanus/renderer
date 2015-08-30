@@ -1,258 +1,219 @@
 #ifndef RENDERER_MATH_H
 #define RENDERER_MATH_H
 
+
 #include <math.h>
 
 
-union v2
-{
-    struct
-    {
-        r32 x, y;
-    };
-    struct
-    {
-        r32 u, v;
-    };
-    r32 E[2];
+union v2 {
+  struct {
+    r32 x, y;
+  };
+  struct {
+    r32 u, v;
+  };
+  r32 E[2];
 };
 
 
-inline v2
-operator*(r32 Scalar, v2 A)
-{
-    v2 Result;
+inline v2 operator*(r32 scalar, v2 a) {
+  v2 result;
 
-    Result.x = A.x * Scalar;
-    Result.y = A.y * Scalar;
+  result.x = a.x * scalar;
+  result.y = a.y * scalar;
 
-    return Result;
+  return result;
 }
 
 
-inline v2
-operator*(v2 A, r32 Scalar)
-{
-    return Scalar * A;
+inline v2 operator*(v2 a, r32 scalar) {
+  return scalar * a;
 }
 
 
-inline v2 &
-operator*=(v2 &A, r32 Scalar)
-{
-    A = A * Scalar;
-
-    return A;
+inline v2 & operator*=(v2 &a, r32 scalar) {
+  a = a * scalar;
+  return a;
 }
 
 
-inline v2
-operator+(v2 A, v2 B)
-{
-    v2 Result;
+inline v2 operator+(v2 a, v2 b) {
+  v2 result;
 
-    Result.x = A.x + B.x;
-    Result.y = A.y + B.y;
+  result.x = a.x + b.x;
+  result.y = a.y + b.y;
 
-    return Result;
+  return result;
 }
 
 
-inline v2 &
-operator+=(v2 &A, v2 B)
-{
-    A = A + B;
-
-    return A;
+inline v2 & operator+=(v2 &a, v2 b) {
+  a = a + b;
+  return a;
 }
 
 
-inline v2
-operator-(v2 A, v2 B)
-{
-    v2 Result;
+inline v2 operator-(v2 a, v2 b) {
+  v2 result;
 
-    Result.x = A.x - B.x;
-    Result.y = A.y - B.y;
+  result.x = a.x - b.x;
+  result.y = a.y - b.y;
 
-    return Result;
+  return result;
 }
 
 
-inline v2 &
-operator-=(v2 &A, v2 B)
+inline v2 & operator-=(v2 &a, v2 b)
 {
-    A = A - B;
+  a = a - b;
 
-    return A;
+  return a;
 }
 
 
 // Unary
-inline v2
-operator-(v2 A)
-{
-    v2 Result;
+inline v2 operator-(v2 a) {
+  v2 result;
 
-    Result.x = -A.x;
-    Result.y = -A.y;
+  result.x = -a.x;
+  result.y = -a.y;
 
-    return Result;
+  return result;
 }
 
 
-inline r32
-Square(r32 Real32)
-{
-    return Real32 * Real32;
+inline r32 Square(r32 value) {
+  return value * value;
 }
 
 
-inline int
-Square(int Int)
-{
-    return Int * Int;
+inline int Square(int value) {
+  return value * value;
 }
 
 
-inline r32
-SquareRoot(r32 Real32)
-{
-    r32 Result = sqrtf(Real32);
-    return Result;
+inline r32 SquareRoot(r32 value) {
+  r32 result = sqrtf(value);
+  return result;
 }
 
 
-inline r32
-Abs(r32 Value)
-{
-    if (Value >= 0)
-        return Value;
-    else
-        return -Value;
+inline r32 Abs(r32 value) {
+  if (value >= 0)
+    return value;
+  else
+    return -value;
 }
 
 
-inline r32
-V2Length(v2 Vector)
-{
-    r32 Result = SquareRoot(Square(Vector.x) + Square(Vector.y));
-    return Result;
+inline int Abs(int value) {
+  if (value >= 0)
+    return value;
+  else
+    return -value;
 }
 
 
-inline r32
-DistanceBetween(v2 Dot1, v2 Dot2)
-{
-    v2 Diff = Dot2 - Dot1;
-    return V2Length(Diff);
+inline void Swap(int *a, int *b) {
+  int buffer = *a;
+  *a = *b;
+  *b = buffer;
 }
 
 
-inline r32
-DotProduct(v2 Vector1, v2 Vector2)
-{
-    r32 Result = Vector1.x * Vector2.x + Vector1.y * Vector2.y;
-    return Result;
+inline r32 V2Length(v2 vector) {
+  r32 result = SquareRoot(Square(vector.x) + Square(vector.y));
+  return result;
+}
+
+
+inline r32 DistanceBetween(v2 dot1, v2 dot2) {
+  v2 diff = dot2 - dot1;
+  return V2Length(diff);
+}
+
+
+inline r32 DotProduct(v2 vector1, v2 vector2) {
+  r32 result = vector1.x * vector2.x + vector1.y * vector2.y;
+  return result;
 }
 
 
 // Vector 3
 
-union v3
-{
-    struct
-    {
-        r32 x, y, z;
-    };
-    r32 E[3];
+union v3 {
+  struct {
+    r32 x, y, z;
+  };
+  r32 E[3];
 };
 
 
-inline v3
-operator*(r32 Scalar, v3 A)
-{
-    v3 Result;
+inline v3 operator*(r32 scalar, v3 a) {
+  v3 result;
 
-    Result.x = A.x * Scalar;
-    Result.y = A.y * Scalar;
-    Result.z = A.z * Scalar;
+  result.x = a.x * scalar;
+  result.y = a.y * scalar;
+  result.z = a.z * scalar;
 
-    return Result;
+  return result;
 }
 
 
-inline v3
-operator*(v3 A, r32 Scalar)
-{
-    return Scalar * A;
+inline v3 operator*(v3 a, r32 scalar) {
+  return scalar * a;
 }
 
 
-inline v3 &
-operator*=(v3 &A, r32 Scalar)
-{
-    A = A * Scalar;
-
-    return A;
+inline v3 & operator*=(v3 &a, r32 scalar) {
+  a = a * scalar;
+  return a;
 }
 
 
-inline v3
-operator+(v3 A, v3 B)
-{
-    v3 Result;
+inline v3 operator+(v3 a, v3 b) {
+  v3 result;
 
-    Result.x = A.x + B.x;
-    Result.y = A.y + B.y;
-    Result.z = A.z + B.z;
+  result.x = a.x + b.x;
+  result.y = a.y + b.y;
+  result.z = a.z + b.z;
 
-    return Result;
+  return result;
 }
 
 
-inline v3 &
-operator+=(v3 &A, v3 B)
-{
-    A = A + B;
-
-    return A;
+inline v3 & operator+=(v3 &a, v3 b) {
+  a = a + b;
+  return a;
 }
 
 
-inline v3
-operator-(v3 A, v3 B)
-{
-    v3 Result;
+inline v3 operator-(v3 a, v3 b) {
+  v3 result;
 
-    Result.x = A.x - B.x;
-    Result.y = A.y - B.y;
-    Result.z = A.z - B.z;
+  result.x = a.x - b.x;
+  result.y = a.y - b.y;
+  result.z = a.z - b.z;
 
-    return Result;
+  return result;
 }
 
 
-inline v3 &
-operator-=(v3 &A, v3 B)
-{
-    A = A - B;
-
-    return A;
+inline v3 & operator-=(v3 &a, v3 b) {
+  a = a - b;
+  return a;
 }
 
 
 // Unary
-inline v3
-operator-(v3 A)
-{
-    v3 Result;
+inline v3 operator-(v3 a) {
+  v3 result;
 
-    Result.x = -A.x;
-    Result.y = -A.y;
-    Result.z = -A.z;
+  result.x = -a.x;
+  result.y = -a.y;
+  result.z = -a.z;
 
-    return Result;
+  return result;
 }
 
 

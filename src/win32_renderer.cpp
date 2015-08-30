@@ -6,197 +6,149 @@
 
 #include "win32_renderer.h"
 
-global bool GlobalRunning;
 
-global BITMAPINFO GlobalBitmapInfo;
-global LARGE_INTEGER GlobalPerformanceFrequency;
+global bool32 g_running;
 
-global game_memory GameMemory;
-global game_offscreen_buffer GameBackBuffer;
+global BITMAPINFO g_bitmap_info;
+global LARGE_INTEGER g_performance_frequency;
+
+global GameOffscreenBuffer g_game_backbuffer;
 
 
-DEBUG_PLATFORM_READ_ENTIRE_FILE(DEBUGPlatformReadEntireFile)
-{
-    file_read_result Result = {};
+FileReadResult PlatformReadEntireFile (char *filename) {
+  FileReadResult result = {};
 
-    HANDLE FileHandle = CreateFile(
-        Filename,
-        GENERIC_READ,
-        FILE_SHARE_READ,
-        0,
-        OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL,
+  HANDLE file_handle = CreateFile(
+    filename,
+    GENERIC_READ,
+    FILE_SHARE_READ,
+    0,   // Security attributes
+    OPEN_EXISTING,
+    FILE_ATTRIBUTE_NORMAL,
+    0);  // Template file
+
+  if (file_handle != INVALID_HANDLE_VALUE) {
+    LARGE_INTEGER file_size;
+    if (GetFileSizeEx(file_handle, &file_size)) {
+      result.memory_size = file_size.QuadPart;
+      result.memory = VirtualAlloc(0, result.memory_size,
+                                   MEM_COMMIT, PAGE_READWRITE);
+      DWORD bytes_read = 0;
+
+      ReadFile(
+        file_handle,
+        result.memory,
+        (u32)result.memory_size,
+        &bytes_read,
         0);
 
-    if (FileHandle != INVALID_HANDLE_VALUE)
-    {
-        LARGE_INTEGER FileSize;
-        if (GetFileSizeEx(FileHandle, &FileSize))
-        {
-            Result.MemorySize = FileSize.QuadPart;
-            Result.Memory = VirtualAlloc(0, Result.MemorySize, MEM_COMMIT, PAGE_READWRITE);
-            DWORD BytesRead = 0;
+      CloseHandle(file_handle);
 
-            ReadFile(
-                FileHandle,
-                Result.Memory,
-                (u32)Result.MemorySize,
-                &BytesRead,
-                0);
-
-            CloseHandle(FileHandle);
-
-            return Result;
-        }
-        else
-        {
-            OutputDebugStringA("Cannot get file size\n");
-            // GetLastError() should help
-        }
+      return result;
+    } else {
+      OutputDebugStringA("Cannot get file size\n");
+      // GetLastError() should help
     }
-    else
-    {
-        OutputDebugStringA("Cannot read from file\n");
-        // GetLastError() should help
-    }
+  } else {
+    OutputDebugStringA("Cannot read from file\n");
+    // GetLastError() should help
+  }
 
-    return Result;
+  return result;
 }
 
 
-CONVERT_BYTES_TO_STRING(ConvertBytesToString)
-{
-    // void *Source, int SourceSize, wchar_t **ModelString
-
-    // Allocate as many char16 as there are bytes (for safety)
-    *ModelString = (wchar_t *)VirtualAlloc(0, SourceSize * sizeof(wchar_t), MEM_COMMIT, PAGE_READWRITE);
-
-    // We assume UTF-8 here
-    MultiByteToWideChar(
-        CP_UTF8,
-        MB_ERR_INVALID_CHARS,
-        (LPCSTR)Source,
-        SourceSize,
-        *ModelString,  // result
-        SourceSize
-    );
+internal void Win32UpdateWindow(HDC hdc) {
+  StretchDIBits(
+    hdc,
+    0, 0, g_game_backbuffer.width, g_game_backbuffer.height,  // dest
+    0, 0, g_game_backbuffer.width, g_game_backbuffer.height,  // src
+    g_game_backbuffer.memory,
+    &g_bitmap_info,
+    DIB_RGB_COLORS, SRCCOPY);
 }
 
 
-internal void
-Win32UpdateWindow(HDC hdc)
-{
-    StretchDIBits(
-        hdc,
-        0, 0, GameBackBuffer.Width, GameBackBuffer.Height,  // dest
-        0, 0, GameBackBuffer.Width, GameBackBuffer.Height,  // src
-        GameBackBuffer.Memory,
-        &GlobalBitmapInfo,
-        DIB_RGB_COLORS, SRCCOPY);
+internal void Win32ResizeClientWindow(HWND window) {
+  RECT client_rect;
+  GetClientRect(window, &client_rect);
+  int width = client_rect.right - client_rect.left;
+  int height = client_rect.bottom - client_rect.top;
+
+  if (width > g_game_backbuffer.max_width)
+    width = g_game_backbuffer.max_width;
+
+  if (height > g_game_backbuffer.max_height)
+    height = g_game_backbuffer.max_height;
+
+  g_game_backbuffer.width = width;
+  g_game_backbuffer.height = height;
+
+  g_bitmap_info.bmiHeader.biWidth = width;
+  g_bitmap_info.bmiHeader.biHeight = -height;
 }
 
 
-internal void
-Win32ResizeClientWindow(HWND Window)
-{
-    if (!GameMemory.IsInitialized)
-        return;  // no buffer yet
+inline LARGE_INTEGER Win32GetWallClock() {
+  LARGE_INTEGER result;
+  QueryPerformanceCounter(&result);
 
-    RECT ClientRect;
-    GetClientRect(Window, &ClientRect);
-    int Width = ClientRect.right - ClientRect.left;
-    int Height = ClientRect.bottom - ClientRect.top;
-
-    if (Width > GameBackBuffer.MaxWidth)
-    {
-        Width = GameBackBuffer.MaxWidth;
-    }
-    if (Height > GameBackBuffer.MaxHeight)
-    {
-        Height = GameBackBuffer.MaxHeight;
-    }
-
-    GameBackBuffer.Width = Width;
-    GameBackBuffer.Height = Height;
-
-    GlobalBitmapInfo.bmiHeader.biWidth = Width;
-    GlobalBitmapInfo.bmiHeader.biHeight = -Height;
+  return result;
 }
 
 
-inline LARGE_INTEGER
-Win32GetWallClock()
-{
-    LARGE_INTEGER Result;
-    QueryPerformanceCounter(&Result);
-
-    return Result;
+inline r32 Win32GetMsElapsed(LARGE_INTEGER start, LARGE_INTEGER End) {
+  r32 result = 1000.0f * (r32) (End.QuadPart - start.QuadPart) /
+               (r32) g_performance_frequency.QuadPart;
+  return result;
 }
 
 
-inline r32
-Win32GetMillisecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End)
-{
-    r32 Result = 1000.0f * (r32) (End.QuadPart - Start.QuadPart) /
-                 (r32) GlobalPerformanceFrequency.QuadPart;
-
-    return Result;
-}
-
-
-LRESULT CALLBACK
-Win32WindowProc(
+LRESULT CALLBACK Win32WindowProc(
     HWND hwnd,
     UINT uMsg,
     WPARAM wParam,
-    LPARAM lParam)
-{
-    LRESULT Result = 0;
+    LPARAM lParam) {
 
-    switch(uMsg)
+  LRESULT result = 0;
+
+  switch(uMsg)
+  {
+    case WM_SIZE:
     {
-        case WM_SIZE:
-        {
-            Win32ResizeClientWindow(hwnd);
-        } break;
+      Win32ResizeClientWindow(hwnd);
+    } break;
 
-        case WM_CLOSE:
-        {
-            GlobalRunning = false;
-        } break;
+    case WM_CLOSE:
+    {
+      g_running = false;
+    } break;
 
-        case WM_PAINT:
-        {
-            PAINTSTRUCT Paint = {};
-            HDC hdc = BeginPaint(hwnd, &Paint);
-            Win32UpdateWindow(
-                hdc  // we update the whole window, always
-                // Paint.rcPaint.left,
-                // Paint.rcPaint.top,
-                // Paint.rcPaint.right - Paint.rcPaint.left,
-                // Paint.rcPaint.bottom - Paint.rcPaint.top
-            );
+    case WM_PAINT:
+    {
+      PAINTSTRUCT Paint = {};
+      HDC hdc = BeginPaint(hwnd, &Paint);
+      Win32UpdateWindow(
+          hdc  // we update the whole window, always
+      );
+      EndPaint(hwnd, &Paint);
+    } break;
 
-            OutputDebugStringA("WM_PAINT\n");
+    case WM_SYSKEYDOWN:
+    case WM_SYSKEYUP:
+    case WM_KEYDOWN:
+    case WM_KEYUP:
+    {
+      Assert(!"Keyboard input came in through a non-dispatch message!");
+    } break;
 
-            EndPaint(hwnd, &Paint);
-        } break;
+    default:
+    {
+      result = DefWindowProc(hwnd, uMsg, wParam, lParam);
+    } break;
+  }
 
-        case WM_SYSKEYDOWN:
-        case WM_SYSKEYUP:
-        case WM_KEYDOWN:
-        case WM_KEYUP:
-        {
-            Assert(!"Keyboard input came in through a non-dispatch message!");
-        } break;
-
-        default:
-        {
-            Result = DefWindowProc(hwnd, uMsg, wParam, lParam);
-        } break;
-    }
-
-    return Result;
+  return result;
 }
 
 
@@ -204,366 +156,197 @@ Win32WindowProc(
 
 
 internal void
-Win32GetExeDir(char *PathToExe)
+Win32ProcessPendingMessages()
 {
-    GetModuleFileName(0, PathToExe, MAX_PATH);
-
-    // Cut the file name
-    char *OnePastLastSlash = PathToExe;
-    for (char *Scan = PathToExe; *Scan; Scan++)
+  MSG message;
+  while (PeekMessage(&message, 0, 0, 0, PM_REMOVE))
+  {
+    // Get keyboard messages
+    switch (message.message)
     {
-        if (*Scan == '\\')
-        {
-            OnePastLastSlash = Scan + 1;
-        }
+      case WM_QUIT:
+      {
+        g_running = false;
+      } break;
+
+      default:
+      {
+        TranslateMessage(&message);
+        DispatchMessageA(&message);
+      } break;
     }
-    *OnePastLastSlash = 0;
+  }
 }
 
 
-internal FILETIME
-Win32GetDLLWriteTime()
+inline void
+SetPixel(int x, int y, u32 color)
 {
-    FILETIME Result = {};
-    WIN32_FIND_DATA FileData = {};
-
-    char ExeDir[MAX_PATH];
-    Win32GetExeDir(ExeDir);
-    char PathToDLL[MAX_PATH];
-    sprintf_s(PathToDLL, "%s%s", ExeDir, GAME_CODE_DLL_FILENAME);
-
-    HANDLE FileFindHandle = FindFirstFile(PathToDLL, &FileData);
-    if (FileFindHandle != INVALID_HANDLE_VALUE)
-    {
-        Result = FileData.ftLastWriteTime;
-    }
-    return Result;
+  // Point 0, 0 is in the left bottom corner
+  int pitch = g_game_backbuffer.width * g_game_backbuffer.bytes_per_pixel;
+  u8 *row = (u8 *)g_game_backbuffer.memory + (g_game_backbuffer.height - 1) * pitch
+            - pitch * y
+            + x * g_game_backbuffer.bytes_per_pixel;
+  u32 *Pixel = (u32 *)row;
+  *Pixel = color;
 }
 
 
-internal void
-Win32UnloadGameCode(win32_game_code *GameCode)
-{
-    GameCode->UpdateAndRender = GameUpdateAndRenderStub;
-    FreeLibrary(GameCode->GameCodeDLL);
-    GameCode->IsValid = false;
-}
+internal void DrawLine(int x0, int y0, int x1, int y1, u32 color) {
+  bool32 steep = false;
+  if (Abs(x1 - x0) < Abs(y1 - y0))
+  {
+    steep = true;
 
-
-internal win32_game_code
-Win32LoadGameCode()
-{
-    win32_game_code Result = {};
-    Result.UpdateAndRender = GameUpdateAndRenderStub;
-
-    char ExeDir[MAX_PATH];
-    char PathToDLL[MAX_PATH];
-    char TmpDLLFile[MAX_PATH];
-    Win32GetExeDir(ExeDir);
-    sprintf_s(PathToDLL, "%s%s", ExeDir, GAME_CODE_DLL_FILENAME);
-    sprintf_s(TmpDLLFile, "%s%s", ExeDir, "renderer_tmp.dll");
-    CopyFile(PathToDLL, TmpDLLFile, FALSE);
-
-    Result.GameCodeDLL = LoadLibraryA(TmpDLLFile);
-    if (Result.GameCodeDLL)
-    {
-        Result.UpdateAndRender = (game_update_and_render *)
-            GetProcAddress(Result.GameCodeDLL, "GameUpdateAndRender");
-        if (Result.UpdateAndRender)
-        {
-            Result.IsValid = true;
-        }
+    Swap(&x0, &y0);
+    Swap(&x1, &y1);
+  }
+  if (x0 > y0)
+  {
+    Swap(&x0, &x1);
+    Swap(&y0, &y1);
+  }
+  int dx = x1 - x0;
+  int dy = y1 - y0;
+  r32 derror = Abs(dy / static_cast<r32>(dx));
+  r32 error = 0;
+  int y = y0;
+  for (int x = x0; x <= x1; x++) {
+    if (steep) {
+        SetPixel(y, x, color);
+    } else {
+        SetPixel(x, y, color);
     }
+    error += derror;
 
-    return Result;
-}
-
-
-internal void
-Win32ProcessKeyboardMessage(game_button_state *NewState, bool32 IsDown)
-{
-    if (NewState->EndedDown != IsDown)
-    {
-        NewState->HalfTransitionCount++;
-        NewState->EndedDown = IsDown;
+    if (error > .5) {
+        y += (y1 > y0 ? 1 : -1);
+        error -= 1.;
     }
-    else
-    {
-        // This may happen if user pressed two buttons
-        // that trigger the same action simultaneously
-    }
-}
-
-
-internal void
-Win32ProcessPendingMessages(game_input *NewInput)
-{
-    MSG Message;
-    while (PeekMessage(&Message, 0, 0, 0, PM_REMOVE))
-    {
-        // Get keyboard messages
-        switch (Message.message)
-        {
-            case WM_QUIT:
-            {
-                GlobalRunning = false;
-            } break;
-
-            case WM_SYSKEYDOWN:
-            case WM_SYSKEYUP:
-            case WM_KEYDOWN:
-            case WM_KEYUP:
-            {
-                u32 VKCode = (u32)Message.wParam;
-                bool32 WasDown = ((Message.lParam & (1 << 30)) != 0);
-                bool32 IsDown = ((Message.lParam & (1 << 31)) == 0);
-
-                player_input *Player1 = &NewInput->Player1;
-                player_input *Player2 = &NewInput->Player2;
-
-                // Get input
-                if (IsDown != WasDown)
-                {
-                    if(VKCode == 'W')
-                    {
-                        Win32ProcessKeyboardMessage(&Player1->Up, IsDown);
-                    }
-                    else if(VKCode == 'S')
-                    {
-                        Win32ProcessKeyboardMessage(&Player1->Down, IsDown);
-                    }
-                    else if(VKCode == 'A')
-                    {
-                        Win32ProcessKeyboardMessage(&Player1->Left, IsDown);
-                    }
-                    else if(VKCode == 'D')
-                    {
-                        Win32ProcessKeyboardMessage(&Player1->Right, IsDown);
-                    }
-                    else if(VKCode == VK_UP)
-                    {
-                        Win32ProcessKeyboardMessage(&Player2->Up, IsDown);
-                    }
-                    else if(VKCode == VK_DOWN)
-                    {
-                        Win32ProcessKeyboardMessage(&Player2->Down, IsDown);
-                    }
-                    else if(VKCode == VK_LEFT)
-                    {
-                        Win32ProcessKeyboardMessage(&Player2->Left, IsDown);
-                    }
-                    else if(VKCode == VK_RIGHT)
-                    {
-                        Win32ProcessKeyboardMessage(&Player2->Right, IsDown);
-                    }
-                }
-
-                bool32 AltKeyWasDown = (Message.lParam & (1 << 29));
-                if((VKCode == VK_F4) && AltKeyWasDown)
-                {
-                    GlobalRunning = false;
-                }
-            } break;
-
-            default:
-            {
-                TranslateMessage(&Message);
-                DispatchMessageA(&Message);
-            } break;
-        }
-    }
+  }
 }
 
 
 int CALLBACK
 WinMain(HINSTANCE hInstance,
-        HINSTANCE hPrevInstance,
-        LPSTR lpCmdLine,
-        int nCmdShow)
+      HINSTANCE hPrevInstance,
+      LPSTR lpCmdLine,
+      int nCmdShow)
 {
-    win32_game_code Game = Win32LoadGameCode();
-    Assert(Game.IsValid);
+  WNDCLASS window_class = {};
+  window_class.style = CS_OWNDC|CS_VREDRAW|CS_HREDRAW;
+  window_class.lpfnWndProc = Win32WindowProc;
+  window_class.hInstance = hInstance;
+  window_class.lpszClassName = "rendererWindowClass";
 
-    WNDCLASS WindowClass = {};
-    WindowClass.style = CS_OWNDC|CS_VREDRAW|CS_HREDRAW;
-    WindowClass.lpfnWndProc = Win32WindowProc;
-    WindowClass.hInstance = hInstance;
-    WindowClass.lpszClassName = "rendererWindowClass";
+  // TODO: query monitor refresh rate
+  int target_fps = 30;
+  r32 target_mspf = 1000.0f / (r32)target_fps;  // Target ms per frame
 
-    // TODO: query monitor refresh rate
-    int TargetFPS = 10;
-    r32 TargetMSPF = 1000.0f / (r32)TargetFPS;  // Target ms per frame
+  // Set target sleep resolution
+  {
+    #define TARGET_SLEEP_RESOLUTION 1   // 1-millisecond target resolution
 
-    // Set target sleep resolution
+    TIMECAPS tc;
+    UINT timer_res;
+
+    if (timeGetDevCaps(&tc, sizeof(TIMECAPS)) != TIMERR_NOERROR)
     {
-        #define TARGET_SLEEP_RESOLUTION 1   // 1-millisecond target resolution
+        OutputDebugStringA("Cannot set the sleep resolution\n");
+        exit(1);
+    }
 
-        TIMECAPS tc;
-        UINT wTimerRes;
+    timer_res = min(max(tc.wPeriodMin, TARGET_SLEEP_RESOLUTION), tc.wPeriodMax);
+    timeBeginPeriod(timer_res);
+  }
 
-        if (timeGetDevCaps(&tc, sizeof(TIMECAPS)) != TIMERR_NOERROR)
+  QueryPerformanceFrequency(&g_performance_frequency);
+
+  if (RegisterClass(&window_class))
+  {
+    int window_width = 1024;
+    int window_height = 768;
+
+    HWND window = CreateWindow(
+      window_class.lpszClassName,
+      0,
+      WS_OVERLAPPEDWINDOW|WS_VISIBLE,
+      CW_USEDEFAULT,
+      CW_USEDEFAULT,
+      window_width,
+      window_height,
+      0,
+      0,
+      hInstance,
+      0);
+
+    // We're not going to release it as we use CS_OWNDC
+    HDC hdc = GetDC(window);
+
+    if (window)
+    {
+      g_running = true;
+
+      LARGE_INTEGER last_timestamp = Win32GetWallClock();
+
+      // Init backbuffer
+      {
+        g_game_backbuffer.max_width = 2000;
+        g_game_backbuffer.max_height = 1500;
+        g_game_backbuffer.bytes_per_pixel = 4;
+
+        int BufferSize = g_game_backbuffer.max_width * g_game_backbuffer.max_height
+                          * g_game_backbuffer.bytes_per_pixel;
+        // TODO: put it into the game_code memory?
+        g_game_backbuffer.memory = VirtualAlloc(0, BufferSize, MEM_COMMIT, PAGE_READWRITE);
+
+        g_bitmap_info.bmiHeader.biSize = sizeof(g_bitmap_info.bmiHeader);
+        g_bitmap_info.bmiHeader.biPlanes = 1;
+        g_bitmap_info.bmiHeader.biBitCount = 32;
+        g_bitmap_info.bmiHeader.biCompression = BI_RGB;
+
+        // Set up proper values of buffers based on actual client size
+        Win32ResizeClientWindow(window);
+      }
+
+      // Main loop
+      while (g_running) {
+
+        // Render
+
+
+        Win32UpdateWindow(hdc);
+
+        // Enforce FPS
+        // TODO: for some reason Time to sleep drops every now and again,
+        // disabling gradient solves or masks this, though I don't see
+        // any reason why this might happen
         {
-            OutputDebugStringA("Cannot set the sleep resolution\n");
-            exit(1);
+          r32 MillisecondsElapsed = Win32GetMsElapsed(last_timestamp, Win32GetWallClock());
+          u32 TimeToSleep = 0;
+
+          if (MillisecondsElapsed < target_mspf) {
+            TimeToSleep = (u32)(target_mspf - MillisecondsElapsed);
+            Sleep(TimeToSleep);
+
+            while (MillisecondsElapsed < target_mspf) {
+              MillisecondsElapsed = Win32GetMsElapsed(last_timestamp, Win32GetWallClock());
+            }
+          }
+          else {
+            OutputDebugStringA("Frame missed\n");
+          }
+
+          last_timestamp = Win32GetWallClock();
         }
-
-        wTimerRes = min(max(tc.wPeriodMin, TARGET_SLEEP_RESOLUTION), tc.wPeriodMax);
-        timeBeginPeriod(wTimerRes);
+      }
     }
+  }
+  else
+  {
+      // TODO: logging
+      OutputDebugStringA("Couldn't register window class");
+  }
 
-    QueryPerformanceFrequency(&GlobalPerformanceFrequency);
-
-    if (RegisterClass(&WindowClass))
-    {
-        int WindowWidth = 1024;
-        int WindowHeight = 768;
-
-        HWND Window = CreateWindow(
-            WindowClass.lpszClassName,
-            0,
-            WS_OVERLAPPEDWINDOW|WS_VISIBLE,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            WindowWidth,
-            WindowHeight,
-            0,
-            0,
-            hInstance,
-            0);
-
-        // We're not going to release it as we use CS_OWNDC
-        HDC hdc = GetDC(Window);
-
-        HBRUSH BgBrush = CreateSolidBrush(RGB(0x00, 0x22, 0x22));
-        SelectObject(hdc, BgBrush);
-        PatBlt(hdc, 0, 0, WindowWidth, WindowHeight, PATCOPY);
-        DeleteObject(BgBrush);
-
-        if (Window)
-        {
-            GlobalRunning = true;
-
-            LARGE_INTEGER LastTimestamp = Win32GetWallClock();
-
-            // Init game memory
-            {
-                GameMemory.MemorySize = 1024 * 1024 * 1024;  // 1 Gigabyte
-                GameMemory.Start = VirtualAlloc(0, GameMemory.MemorySize, MEM_COMMIT, PAGE_READWRITE);
-                // SecureZeroMemory(GameMemory.Start, GameMemory.MemorySize);
-                GameMemory.Free = GameMemory.Start;
-                GameMemory.IsInitialized = true;
-
-                GameMemory.DEBUGPlatformReadEntireFile = DEBUGPlatformReadEntireFile;
-                GameMemory.ConvertBytesToString = ConvertBytesToString;
-                // GameMemory.DEBUGPlatformWriteEntireFile = DEBUGPlatformWriteEntireFile;
-            }
-
-            // Init backbuffer
-            {
-                GameBackBuffer.MaxWidth = 2000;
-                GameBackBuffer.MaxHeight = 1500;
-                GameBackBuffer.BytesPerPixel = 4;
-
-                int BufferSize = GameBackBuffer.MaxWidth * GameBackBuffer.MaxHeight
-                                  * GameBackBuffer.BytesPerPixel;
-                // TODO: put it into the game memory?
-                GameBackBuffer.Memory = VirtualAlloc(0, BufferSize, MEM_COMMIT, PAGE_READWRITE);
-
-                GlobalBitmapInfo.bmiHeader.biSize = sizeof(GlobalBitmapInfo.bmiHeader);
-                GlobalBitmapInfo.bmiHeader.biPlanes = 1;
-                GlobalBitmapInfo.bmiHeader.biBitCount = 32;
-                GlobalBitmapInfo.bmiHeader.biCompression = BI_RGB;
-
-                // Set up proper values of buffers based on actual client size
-                Win32ResizeClientWindow(Window);
-            }
-
-            // Get space for inputs
-            game_input Input[2];
-            game_input *OldInput = &Input[0];
-            game_input *NewInput = &Input[1];
-            *NewInput = {};
-
-            FILETIME LastDLLWriteTime = Win32GetDLLWriteTime();
-
-            // Main loop
-            while (GlobalRunning)
-            {
-                FILETIME NewDLLWriteTime = Win32GetDLLWriteTime();
-                int CMP = CompareFileTime(&LastDLLWriteTime, &NewDLLWriteTime);
-                if (CMP != 0)
-                {
-                    Win32UnloadGameCode(&Game);
-                    Game = Win32LoadGameCode();
-                    LastDLLWriteTime = NewDLLWriteTime;
-                }
-
-                // Collect input
-                Win32ProcessPendingMessages(NewInput);
-                NewInput->dtForFrame = TargetMSPF;
-
-                Game.UpdateAndRender(NewInput, &GameBackBuffer, &GameMemory);
-
-                // Swap inputs
-                game_input *TmpInput = OldInput;
-                OldInput = NewInput;
-                NewInput = TmpInput;
-                *NewInput = {};  // zero everything
-
-                // Retain the EndedDown state
-                for (int PlayerNum = 0; PlayerNum < COUNT_OF(NewInput->Players); PlayerNum++)
-                {
-                    player_input *OldPlayerInput = &OldInput->Players[PlayerNum];
-                    player_input *NewPlayerInput = &NewInput->Players[PlayerNum];
-                    for (int ButtonNum = 0; ButtonNum < COUNT_OF(OldPlayerInput->Buttons); ButtonNum++)
-                    {
-                        NewPlayerInput->Buttons[ButtonNum].EndedDown =
-                            OldPlayerInput->Buttons[ButtonNum].EndedDown;
-                    }
-                }
-
-                Win32UpdateWindow(hdc);
-
-                // Enforce FPS
-                // TODO: for some reason Time to sleep drops every now and again,
-                // disabling gradient solves or masks this, though I don't see
-                // any reason why this might happen
-                {
-                    r32 MillisecondsElapsed = Win32GetMillisecondsElapsed(LastTimestamp, Win32GetWallClock());
-                    u32 TimeToSleep = 0;
-
-                    if (MillisecondsElapsed < TargetMSPF)
-                    {
-                        TimeToSleep = (u32)(TargetMSPF - MillisecondsElapsed);
-                        Sleep(TimeToSleep);
-
-                        while (MillisecondsElapsed < TargetMSPF)
-                        {
-                            MillisecondsElapsed = Win32GetMillisecondsElapsed(LastTimestamp, Win32GetWallClock());
-                        }
-                    }
-                    else
-                    {
-                        OutputDebugStringA("Frame missed\n");
-                    }
-
-                    LastTimestamp = Win32GetWallClock();
-
-                    // if (TimeToSleep)
-                    // {
-                    //     char String[300];
-                    //     sprintf_s(String, "Time to sleep: %d, Ms elapsed: %.2f, < 10 = %d\n", TimeToSleep, MillisecondsElapsed, TimeToSleep < 10);
-                    //     OutputDebugStringA(String);
-                    // }
-                }
-            }
-        }
-    }
-    else
-    {
-        // TODO: logging
-        OutputDebugStringA("Couldn't register window class");
-    }
-
-    return 0;
+  return 0;
 }
