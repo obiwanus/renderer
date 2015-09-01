@@ -6,13 +6,14 @@
 
 #include "win32_renderer.h"
 
-
 global bool32 g_running;
 
 global BITMAPINFO g_bitmap_info;
 global LARGE_INTEGER g_performance_frequency;
 
 global GameOffscreenBuffer g_game_backbuffer;
+
+#include "renderer.cpp"
 
 
 FileReadResult PlatformReadEntireFile (char *filename) {
@@ -112,8 +113,7 @@ LRESULT CALLBACK Win32WindowProc(
 
   LRESULT result = 0;
 
-  switch(uMsg)
-  {
+  switch(uMsg) {
     case WM_SIZE:
     {
       Win32ResizeClientWindow(hwnd);
@@ -139,7 +139,10 @@ LRESULT CALLBACK Win32WindowProc(
     case WM_KEYDOWN:
     case WM_KEYUP:
     {
-      Assert(!"Keyboard input came in through a non-dispatch message!");
+      if (wParam == VK_ESCAPE) {
+        g_running = false;
+      }
+      // Assert(!"Keyboard input came in through a non-dispatch message!");
     } break;
 
     default:
@@ -150,9 +153,6 @@ LRESULT CALLBACK Win32WindowProc(
 
   return result;
 }
-
-
-#define GAME_CODE_DLL_FILENAME "renderer.dll"
 
 
 internal void
@@ -174,54 +174,6 @@ Win32ProcessPendingMessages()
         TranslateMessage(&message);
         DispatchMessageA(&message);
       } break;
-    }
-  }
-}
-
-
-inline void
-SetPixel(int x, int y, u32 color)
-{
-  // Point 0, 0 is in the left bottom corner
-  int pitch = g_game_backbuffer.width * g_game_backbuffer.bytes_per_pixel;
-  u8 *row = (u8 *)g_game_backbuffer.memory + (g_game_backbuffer.height - 1) * pitch
-            - pitch * y
-            + x * g_game_backbuffer.bytes_per_pixel;
-  u32 *Pixel = (u32 *)row;
-  *Pixel = color;
-}
-
-
-internal void DrawLine(int x0, int y0, int x1, int y1, u32 color) {
-  bool32 steep = false;
-  if (Abs(x1 - x0) < Abs(y1 - y0))
-  {
-    steep = true;
-
-    Swap(&x0, &y0);
-    Swap(&x1, &y1);
-  }
-  if (x0 > y0)
-  {
-    Swap(&x0, &x1);
-    Swap(&y0, &y1);
-  }
-  int dx = x1 - x0;
-  int dy = y1 - y0;
-  r32 derror = Abs(dy / static_cast<r32>(dx));
-  r32 error = 0;
-  int y = y0;
-  for (int x = x0; x <= x1; x++) {
-    if (steep) {
-        SetPixel(y, x, color);
-    } else {
-        SetPixel(x, y, color);
-    }
-    error += derror;
-
-    if (error > .5) {
-        y += (y1 > y0 ? 1 : -1);
-        error -= 1.;
     }
   }
 }
@@ -250,10 +202,9 @@ WinMain(HINSTANCE hInstance,
     TIMECAPS tc;
     UINT timer_res;
 
-    if (timeGetDevCaps(&tc, sizeof(TIMECAPS)) != TIMERR_NOERROR)
-    {
-        OutputDebugStringA("Cannot set the sleep resolution\n");
-        exit(1);
+    if (timeGetDevCaps(&tc, sizeof(TIMECAPS)) != TIMERR_NOERROR) {
+      OutputDebugStringA("Cannot set the sleep resolution\n");
+      exit(1);
     }
 
     timer_res = min(max(tc.wPeriodMin, TARGET_SLEEP_RESOLUTION), tc.wPeriodMax);
@@ -262,29 +213,27 @@ WinMain(HINSTANCE hInstance,
 
   QueryPerformanceFrequency(&g_performance_frequency);
 
-  if (RegisterClass(&window_class))
-  {
-    int window_width = 1024;
-    int window_height = 768;
+  if (RegisterClass(&window_class)) {
+    const int window_width = 1024;
+    const int window_height = 768;
 
     HWND window = CreateWindow(
-      window_class.lpszClassName,
-      0,
-      WS_OVERLAPPEDWINDOW|WS_VISIBLE,
-      CW_USEDEFAULT,
-      CW_USEDEFAULT,
-      window_width,
-      window_height,
-      0,
-      0,
-      hInstance,
-      0);
+        window_class.lpszClassName,
+        0,
+        WS_OVERLAPPEDWINDOW|WS_VISIBLE,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        window_width,
+        window_height,
+        0,
+        0,
+        hInstance,
+        0);
 
     // We're not going to release it as we use CS_OWNDC
     HDC hdc = GetDC(window);
 
-    if (window)
-    {
+    if (window) {
       g_running = true;
 
       LARGE_INTEGER last_timestamp = Win32GetWallClock();
@@ -295,8 +244,9 @@ WinMain(HINSTANCE hInstance,
         g_game_backbuffer.max_height = 1500;
         g_game_backbuffer.bytes_per_pixel = 4;
 
-        int BufferSize = g_game_backbuffer.max_width * g_game_backbuffer.max_height
-                          * g_game_backbuffer.bytes_per_pixel;
+        int BufferSize = g_game_backbuffer.max_width *
+                         g_game_backbuffer.max_height *
+                         g_game_backbuffer.bytes_per_pixel;
         // TODO: put it into the game_code memory?
         g_game_backbuffer.memory = VirtualAlloc(0, BufferSize, MEM_COMMIT, PAGE_READWRITE);
 
@@ -312,8 +262,9 @@ WinMain(HINSTANCE hInstance,
       // Main loop
       while (g_running) {
 
-        // Render
+        Win32ProcessPendingMessages();
 
+        Render();
 
         Win32UpdateWindow(hdc);
 
