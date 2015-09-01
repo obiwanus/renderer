@@ -20,3 +20,25 @@ struct FileReadResult {
   u64 memory_size;
 };
 
+
+union Face {
+  // Three vertices
+  struct {
+    int v1;
+    int v2;
+    int v3;
+  };
+
+  int e[3];
+};
+
+
+struct Model {
+  bool32 is_loaded;
+
+  v3 *vertices;
+  int vert_count;
+
+  Face *faces;
+  int face_count;
+};
