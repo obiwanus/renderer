@@ -248,7 +248,8 @@ WinMain(HINSTANCE hInstance,
                          g_game_backbuffer.max_height *
                          g_game_backbuffer.bytes_per_pixel;
         // TODO: put it into the game_code memory?
-        g_game_backbuffer.memory = VirtualAlloc(0, BufferSize, MEM_COMMIT, PAGE_READWRITE);
+        g_game_backbuffer.memory = VirtualAlloc(0, BufferSize,
+                                                MEM_COMMIT, PAGE_READWRITE);
 
         g_bitmap_info.bmiHeader.biSize = sizeof(g_bitmap_info.bmiHeader);
         g_bitmap_info.bmiHeader.biPlanes = 1;
@@ -273,7 +274,8 @@ WinMain(HINSTANCE hInstance,
         // disabling gradient solves or masks this, though I don't see
         // any reason why this might happen
         {
-          r32 MillisecondsElapsed = Win32GetMsElapsed(last_timestamp, Win32GetWallClock());
+          r32 MillisecondsElapsed = Win32GetMsElapsed(last_timestamp,
+                                                      Win32GetWallClock());
           u32 TimeToSleep = 0;
 
           if (MillisecondsElapsed < target_mspf) {
@@ -281,7 +283,8 @@ WinMain(HINSTANCE hInstance,
             Sleep(TimeToSleep);
 
             while (MillisecondsElapsed < target_mspf) {
-              MillisecondsElapsed = Win32GetMsElapsed(last_timestamp, Win32GetWallClock());
+              MillisecondsElapsed = Win32GetMsElapsed(last_timestamp,
+                                                      Win32GetWallClock());
             }
           }
           else {

@@ -22,16 +22,16 @@ inline void SetPixel(int x, int y, u32 color) {
 }
 
 
-internal void DrawLine(int x0, int y0, int x1, int y1, u32 color) {
+internal void Line(int x0, int y0, int x1, int y1, u32 color) {
   bool32 steep = false;
   if (Abs(x1 - x0) < Abs(y1 - y0)) {
     steep = true;
-    Swap(&x0, &y0);
-    Swap(&x1, &y1);
+    swap_int(&x0, &y0);
+    swap_int(&x1, &y1);
   }
   if (x0 > x1) {
-    Swap(&x0, &x1);
-    Swap(&y0, &y1);
+    swap_int(&x0, &x1);
+    swap_int(&y0, &y1);
   }
 
   int dx = x1 - x0;
@@ -53,6 +53,22 @@ internal void DrawLine(int x0, int y0, int x1, int y1, u32 color) {
       error2 -= 2 * dx;
     }
   }
+}
+
+
+internal void Triangle(v2i *p0, v2i *p1, v2i *p2, u32 color) {
+  // Sort points by y
+  if (p0->y < p1->y)
+    swap_pointers(&p0, &p1);
+  if (p1->y < p2->y)
+    swap_pointers(&p1, &p2);
+  if (p0->y < p1->y)
+    swap_pointers(&p0, &p1);
+
+  // Debug
+  Line(p0->x, p0->y, p1->x, p1->y, color);
+  Line(p0->x, p0->y, p2->x, p2->y, color);
+  Line(p1->x, p1->y, p2->x, p2->y, color);
 }
 
 
@@ -119,23 +135,31 @@ internal void Render() {
   u32 color = 0x00999999;
 
   // Draw model
-  for (int i = 0; i < g_model.face_count; ++i) {
-    Face *face = &g_model.faces[i];
-    for (int j = 0; j < 3; ++j) {
-      v3 *vert0 = &g_model.vertices[face->e[j] - 1];
-      v3 *vert1 = &g_model.vertices[face->e[(j+1) % 3] - 1];
+  // for (int i = 0; i < g_model.face_count; ++i) {
+  //   Face *face = &g_model.faces[i];
+  //   for (int j = 0; j < 3; ++j) {
+  //     v3 *vert0 = &g_model.vertices[face->e[j] - 1];
+  //     v3 *vert1 = &g_model.vertices[face->e[(j+1) % 3] - 1];
 
-      int height = g_game_backbuffer.height;
+  //     int height = g_game_backbuffer.height;
 
-      int x0 = static_cast<int>((vert0->x + 1.0f) * height / 2.0f);
-      int y0 = static_cast<int>((vert0->y + 1.0f) * height / 2.0f);
+  //     int x0 = static_cast<int>((vert0->x + 1.0f) * height / 2.0f);
+  //     int y0 = static_cast<int>((vert0->y + 1.0f) * height / 2.0f);
 
-      int x1 = static_cast<int>((vert1->x + 1.0f) * height / 2.0f);
-      int y1 = static_cast<int>((vert1->y + 1.0f) * height / 2.0f);
+  //     int x1 = static_cast<int>((vert1->x + 1.0f) * height / 2.0f);
+  //     int y1 = static_cast<int>((vert1->y + 1.0f) * height / 2.0f);
 
-      DrawLine(x0, y0, x1, y1, color);
-    }
-  }
+  //     Line(x0, y0, x1, y1, color);
+  //   }
+  // }
+
+  v2i p0[3] = {{10, 70},   {50, 160},  {70, 80}};
+  v2i p1[3] = {{180, 50},  {150, 1},   {70, 180}};
+  v2i p2[3] = {{180, 150}, {120, 160}, {130, 180}};
+
+  Triangle(&p0[0], &p0[1], &p0[2], color);
+  Triangle(&p1[0], &p1[1], &p1[2], color);
+  Triangle(&p2[0], &p2[1], &p2[2], color);
 }
 
 

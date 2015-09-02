@@ -3,6 +3,7 @@
 
 
 #include <math.h>
+#include <memory.h>
 
 
 union v2 {
@@ -114,10 +115,20 @@ inline int Abs(int value) {
 }
 
 
-inline void Swap(int *a, int *b) {
+inline void swap_int(int *a, int *b) {
   int buffer = *a;
   *a = *b;
   *b = buffer;
+}
+
+
+inline void swap_pointers(void *a, void *b) {
+  const int size = sizeof(void *);
+  char temp[size];
+
+  memcpy(temp, b, size);
+  memcpy(b, a, size);
+  memcpy(a, temp, size);
 }
 
 
@@ -137,6 +148,16 @@ inline r32 DotProduct(v2 vector1, v2 vector2) {
   r32 result = vector1.x * vector2.x + vector1.y * vector2.y;
   return result;
 }
+
+
+// Integer vector 2
+
+union v2i {
+  struct {
+    int x, y;
+  };
+  int e[2];
+};
 
 
 // Vector 3
