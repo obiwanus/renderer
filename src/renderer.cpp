@@ -3,24 +3,21 @@
 
 #include <stdio.h>
 
-
 global Model g_model;
-
 
 inline void SetPixel(int x, int y, u32 color) {
   // Point 0, 0 is in the left bottom corner
-  if (x < 0 || y < 0 ||
-      x >= g_game_backbuffer.width || y >= g_game_backbuffer.height)
+  if (x < 0 || y < 0 || x >= g_game_backbuffer.width ||
+      y >= g_game_backbuffer.height)
     return;
 
   int pitch = g_game_backbuffer.width * g_game_backbuffer.bytes_per_pixel;
   u8 *row = (u8 *)g_game_backbuffer.memory +
-            (g_game_backbuffer.height - 1) * pitch -
-            pitch * y + x * g_game_backbuffer.bytes_per_pixel;
+            (g_game_backbuffer.height - 1) * pitch - pitch * y +
+            x * g_game_backbuffer.bytes_per_pixel;
   u32 *Pixel = (u32 *)row;
   *Pixel = color;
 }
-
 
 internal void Line(int x0, int y0, int x1, int y1, u32 color) {
   bool32 steep = false;
@@ -55,22 +52,53 @@ internal void Line(int x0, int y0, int x1, int y1, u32 color) {
   }
 }
 
-
 internal void Triangle(v2i *p0, v2i *p1, v2i *p2, u32 color) {
   // Sort points by y
-  if (p0->y < p1->y)
-    swap_pointers(&p0, &p1);
-  if (p1->y < p2->y)
-    swap_pointers(&p1, &p2);
-  if (p0->y < p1->y)
-    swap_pointers(&p0, &p1);
+  if (p0->y > p1->y) swap_pointers(&p0, &p1);
+  if (p1->y > p2->y) swap_pointers(&p1, &p2);
+  if (p0->y > p1->y) swap_pointers(&p0, &p1);
 
-  // Debug
-  Line(p0->x, p0->y, p1->x, p1->y, color);
-  Line(p0->x, p0->y, p2->x, p2->y, color);
-  Line(p1->x, p1->y, p2->x, p2->y, color);
+  {
+    // Line p0 -> p2, part 1
+    int x0 = p0->x, y0 = p0->y;
+    int x1 = p1->x, y1 = p1->y;
+
+    bool32 steep = Abs(x1 - x0) < Abs(y1 - y0);
+
+    int dx = x1 - x0;
+    int dy = y1 - y0;  // always positive
+    r32 derror = Abs(dx) / (r32)dy;
+    r32 error = 0;
+    int x = x0;
+    int sign_dx = (p0->x < p1->x ? 1 : -1);
+
+    for (int y = y0; y < y1; ++y) {
+      if (steep) {
+        // TODO: left or right oriented
+        while (error <= 0.5f) {
+          error += derror;
+          x += sign_dx;
+        }
+        error -= 1.0f;
+      } else {
+        error += derror;
+        if (error > 0.5f) {
+          x += sign_dx;
+          error -= 1.0f;
+        }
+      }
+      SetPixel(x, y, color);
+    }
+  }
+
+  // for (int y = p1->y; y <= p2->y; ++y) {
+
+  // }
+
+  // RasterizeLine(p0, p1, color);
+  // RasterizeLine(p0, p2, color);
+  // RasterizeLine(p1, p2, color);
 }
-
 
 internal void LoadModelFromFile(char *filename) {
   FILE *file;
@@ -91,14 +119,10 @@ internal void LoadModelFromFile(char *filename) {
   }
 
   // Allocate space for data
-  g_model.vertices = static_cast<v3 *>(
-      VirtualAlloc(0, sizeof(v3) * g_model.vert_count,
-                   MEM_COMMIT, PAGE_READWRITE)
-  );
-  g_model.faces = static_cast<Face *>(
-      VirtualAlloc(0, sizeof(Face) * g_model.face_count,
-                   MEM_COMMIT, PAGE_READWRITE)
-  );
+  g_model.vertices = static_cast<v3 *>(VirtualAlloc(
+      0, sizeof(v3) * g_model.vert_count, MEM_COMMIT, PAGE_READWRITE));
+  g_model.faces = static_cast<Face *>(VirtualAlloc(
+      0, sizeof(Face) * g_model.face_count, MEM_COMMIT, PAGE_READWRITE));
   v3 *v = g_model.vertices;
   Face *f = g_model.faces;
 
@@ -126,11 +150,8 @@ internal void LoadModelFromFile(char *filename) {
   g_model.is_loaded = true;
 }
 
-
 internal void Render() {
-
-  if (!g_model.is_loaded)
-    LoadModelFromFile("african_head.model");
+  if (!g_model.is_loaded) LoadModelFromFile("african_head.model");
 
   u32 color = 0x00999999;
 
@@ -153,14 +174,13 @@ internal void Render() {
   //   }
   // }
 
-  v2i p0[3] = {{10, 70},   {50, 160},  {70, 80}};
-  v2i p1[3] = {{180, 50},  {150, 1},   {70, 180}};
+  v2i p0[3] = {{10, 70}, {50, 160}, {70, 80}};
+  v2i p1[3] = {{180, 50}, {150, 1}, {70, 180}};
   v2i p2[3] = {{180, 150}, {120, 160}, {130, 180}};
 
   Triangle(&p0[0], &p0[1], &p0[2], color);
   Triangle(&p1[0], &p1[1], &p1[2], color);
   Triangle(&p2[0], &p2[1], &p2[2], color);
 }
-
 
 #endif  // RENDERER_CPP

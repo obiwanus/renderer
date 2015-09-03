@@ -4,22 +4,19 @@
 #include "renderer_platform.h"
 #include "renderer_math.h"
 
-
 struct GameOffscreenBuffer {
   void *memory;
   int width;
   int height;
   int bytes_per_pixel;
-  int max_width;   // We'll only allocate this much
+  int max_width;  // We'll only allocate this much
   int max_height;
 };
-
 
 struct FileReadResult {
   void *memory;
   u64 memory_size;
 };
-
 
 union Face {
   // Three vertices
@@ -31,7 +28,6 @@ union Face {
 
   int e[3];
 };
-
 
 struct Model {
   bool32 is_loaded;

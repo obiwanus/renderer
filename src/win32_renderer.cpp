@@ -15,33 +15,24 @@ global GameOffscreenBuffer g_game_backbuffer;
 
 #include "renderer.cpp"
 
-
-FileReadResult PlatformReadEntireFile (char *filename) {
+FileReadResult PlatformReadEntireFile(char *filename) {
   FileReadResult result = {};
 
-  HANDLE file_handle = CreateFile(
-    filename,
-    GENERIC_READ,
-    FILE_SHARE_READ,
-    0,   // Security attributes
-    OPEN_EXISTING,
-    FILE_ATTRIBUTE_NORMAL,
-    0);  // Template file
+  HANDLE file_handle = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ,
+                                  0,  // Security attributes
+                                  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
+                                  0);  // Template file
 
   if (file_handle != INVALID_HANDLE_VALUE) {
     LARGE_INTEGER file_size;
     if (GetFileSizeEx(file_handle, &file_size)) {
       result.memory_size = file_size.QuadPart;
-      result.memory = VirtualAlloc(0, result.memory_size,
-                                   MEM_COMMIT, PAGE_READWRITE);
+      result.memory =
+          VirtualAlloc(0, result.memory_size, MEM_COMMIT, PAGE_READWRITE);
       DWORD bytes_read = 0;
 
-      ReadFile(
-        file_handle,
-        result.memory,
-        (u32)result.memory_size,
-        &bytes_read,
-        0);
+      ReadFile(file_handle, result.memory, (u32)result.memory_size, &bytes_read,
+               0);
 
       CloseHandle(file_handle);
 
@@ -58,17 +49,12 @@ FileReadResult PlatformReadEntireFile (char *filename) {
   return result;
 }
 
-
 internal void Win32UpdateWindow(HDC hdc) {
   StretchDIBits(
-    hdc,
-    0, 0, g_game_backbuffer.width, g_game_backbuffer.height,  // dest
-    0, 0, g_game_backbuffer.width, g_game_backbuffer.height,  // src
-    g_game_backbuffer.memory,
-    &g_bitmap_info,
-    DIB_RGB_COLORS, SRCCOPY);
+      hdc, 0, 0, g_game_backbuffer.width, g_game_backbuffer.height,  // dest
+      0, 0, g_game_backbuffer.width, g_game_backbuffer.height,       // src
+      g_game_backbuffer.memory, &g_bitmap_info, DIB_RGB_COLORS, SRCCOPY);
 }
-
 
 internal void Win32ResizeClientWindow(HWND window) {
   RECT client_rect;
@@ -76,8 +62,7 @@ internal void Win32ResizeClientWindow(HWND window) {
   int width = client_rect.right - client_rect.left;
   int height = client_rect.bottom - client_rect.top;
 
-  if (width > g_game_backbuffer.max_width)
-    width = g_game_backbuffer.max_width;
+  if (width > g_game_backbuffer.max_width) width = g_game_backbuffer.max_width;
 
   if (height > g_game_backbuffer.max_height)
     height = g_game_backbuffer.max_height;
@@ -89,7 +74,6 @@ internal void Win32ResizeClientWindow(HWND window) {
   g_bitmap_info.bmiHeader.biHeight = -height;
 }
 
-
 inline LARGE_INTEGER Win32GetWallClock() {
   LARGE_INTEGER result;
   QueryPerformanceCounter(&result);
@@ -97,80 +81,59 @@ inline LARGE_INTEGER Win32GetWallClock() {
   return result;
 }
 
-
 inline r32 Win32GetMsElapsed(LARGE_INTEGER start, LARGE_INTEGER End) {
-  r32 result = 1000.0f * (r32) (End.QuadPart - start.QuadPart) /
-               (r32) g_performance_frequency.QuadPart;
+  r32 result = 1000.0f * (r32)(End.QuadPart - start.QuadPart) /
+               (r32)g_performance_frequency.QuadPart;
   return result;
 }
 
-
-LRESULT CALLBACK Win32WindowProc(
-    HWND hwnd,
-    UINT uMsg,
-    WPARAM wParam,
-    LPARAM lParam) {
-
+LRESULT CALLBACK
+Win32WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
   LRESULT result = 0;
 
-  switch(uMsg) {
-    case WM_SIZE:
-    {
+  switch (uMsg) {
+    case WM_SIZE: {
       Win32ResizeClientWindow(hwnd);
     } break;
 
-    case WM_CLOSE:
-    {
+    case WM_CLOSE: {
       g_running = false;
     } break;
 
-    case WM_PAINT:
-    {
+    case WM_PAINT: {
       PAINTSTRUCT Paint = {};
       HDC hdc = BeginPaint(hwnd, &Paint);
-      Win32UpdateWindow(
-          hdc  // we update the whole window, always
-      );
+      Win32UpdateWindow(hdc  // we update the whole window, always
+                        );
       EndPaint(hwnd, &Paint);
     } break;
 
     case WM_SYSKEYDOWN:
     case WM_SYSKEYUP:
     case WM_KEYDOWN:
-    case WM_KEYUP:
-    {
+    case WM_KEYUP: {
       if (wParam == VK_ESCAPE) {
         g_running = false;
       }
       // Assert(!"Keyboard input came in through a non-dispatch message!");
     } break;
 
-    default:
-    {
-      result = DefWindowProc(hwnd, uMsg, wParam, lParam);
-    } break;
+    default: { result = DefWindowProc(hwnd, uMsg, wParam, lParam); } break;
   }
 
   return result;
 }
 
-
-internal void
-Win32ProcessPendingMessages()
-{
+internal void Win32ProcessPendingMessages() {
   MSG message;
-  while (PeekMessage(&message, 0, 0, 0, PM_REMOVE))
-  {
+  while (PeekMessage(&message, 0, 0, 0, PM_REMOVE)) {
     // Get keyboard messages
-    switch (message.message)
-    {
-      case WM_QUIT:
-      {
+    switch (message.message) {
+      case WM_QUIT: {
         g_running = false;
       } break;
 
-      default:
-      {
+      default: {
         TranslateMessage(&message);
         DispatchMessageA(&message);
       } break;
@@ -178,15 +141,10 @@ Win32ProcessPendingMessages()
   }
 }
 
-
-int CALLBACK
-WinMain(HINSTANCE hInstance,
-      HINSTANCE hPrevInstance,
-      LPSTR lpCmdLine,
-      int nCmdShow)
-{
+int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                     LPSTR lpCmdLine, int nCmdShow) {
   WNDCLASS window_class = {};
-  window_class.style = CS_OWNDC|CS_VREDRAW|CS_HREDRAW;
+  window_class.style = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
   window_class.lpfnWndProc = Win32WindowProc;
   window_class.hInstance = hInstance;
   window_class.lpszClassName = "rendererWindowClass";
@@ -197,7 +155,7 @@ WinMain(HINSTANCE hInstance,
 
   // Set target sleep resolution
   {
-    #define TARGET_SLEEP_RESOLUTION 1   // 1-millisecond target resolution
+#define TARGET_SLEEP_RESOLUTION 1  // 1-millisecond target resolution
 
     TIMECAPS tc;
     UINT timer_res;
@@ -217,18 +175,10 @@ WinMain(HINSTANCE hInstance,
     const int window_width = 1024;
     const int window_height = 768;
 
-    HWND window = CreateWindow(
-        window_class.lpszClassName,
-        0,
-        WS_OVERLAPPEDWINDOW|WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        window_width,
-        window_height,
-        0,
-        0,
-        hInstance,
-        0);
+    HWND window = CreateWindow(window_class.lpszClassName, 0,
+                               WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT,
+                               CW_USEDEFAULT, window_width, window_height, 0, 0,
+                               hInstance, 0);
 
     // We're not going to release it as we use CS_OWNDC
     HDC hdc = GetDC(window);
@@ -248,8 +198,8 @@ WinMain(HINSTANCE hInstance,
                          g_game_backbuffer.max_height *
                          g_game_backbuffer.bytes_per_pixel;
         // TODO: put it into the game_code memory?
-        g_game_backbuffer.memory = VirtualAlloc(0, BufferSize,
-                                                MEM_COMMIT, PAGE_READWRITE);
+        g_game_backbuffer.memory =
+            VirtualAlloc(0, BufferSize, MEM_COMMIT, PAGE_READWRITE);
 
         g_bitmap_info.bmiHeader.biSize = sizeof(g_bitmap_info.bmiHeader);
         g_bitmap_info.bmiHeader.biPlanes = 1;
@@ -262,7 +212,6 @@ WinMain(HINSTANCE hInstance,
 
       // Main loop
       while (g_running) {
-
         Win32ProcessPendingMessages();
 
         Render();
@@ -274,8 +223,8 @@ WinMain(HINSTANCE hInstance,
         // disabling gradient solves or masks this, though I don't see
         // any reason why this might happen
         {
-          r32 MillisecondsElapsed = Win32GetMsElapsed(last_timestamp,
-                                                      Win32GetWallClock());
+          r32 MillisecondsElapsed =
+              Win32GetMsElapsed(last_timestamp, Win32GetWallClock());
           u32 TimeToSleep = 0;
 
           if (MillisecondsElapsed < target_mspf) {
@@ -283,11 +232,10 @@ WinMain(HINSTANCE hInstance,
             Sleep(TimeToSleep);
 
             while (MillisecondsElapsed < target_mspf) {
-              MillisecondsElapsed = Win32GetMsElapsed(last_timestamp,
-                                                      Win32GetWallClock());
+              MillisecondsElapsed =
+                  Win32GetMsElapsed(last_timestamp, Win32GetWallClock());
             }
-          }
-          else {
+          } else {
             OutputDebugStringA("Frame missed\n");
           }
 
@@ -295,11 +243,9 @@ WinMain(HINSTANCE hInstance,
         }
       }
     }
-  }
-  else
-  {
-      // TODO: logging
-      OutputDebugStringA("Couldn't register window class");
+  } else {
+    // TODO: logging
+    OutputDebugStringA("Couldn't register window class");
   }
 
   return 0;
