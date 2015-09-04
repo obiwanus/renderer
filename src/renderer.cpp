@@ -84,6 +84,7 @@ Line::Line(v2i *p0, v2i *p1, bool32 is_left_side) {
 }
 
 int Line::GetNextX(void) {
+
   if (steep) {
     error += 1.0f;
     if (error >= derror) {
@@ -91,12 +92,13 @@ int Line::GetNextX(void) {
       x += sign_dx;
     }
   } else {
-    while (error < 0.5f && x < x1) {
+    while (error < 0.5f && (x * sign_dx) < (x1 * sign_dx)) {
       error += derror;
       x += sign_dx;
     }
     error -= 1.0f;
   }
+
   return x;
 }
 
@@ -227,13 +229,13 @@ internal void Render() {
   v2i p1[3] = {{180, 50}, {150, 1}, {70, 180}};
   v2i p2[3] = {{180, 150}, {120, 160}, {130, 180}};
 
-  DebugTriangle(&p0[0], &p0[1], &p0[2], 0x00FF0000);
+  // DebugTriangle(&p0[0], &p0[1], &p0[2], 0x00FF0000);
   // DebugTriangle(&p1[0], &p1[1], &p1[2], 0x00FF0000);
-  // DebugTriangle(&p2[0], &p2[1], &p2[2], 0x00FF0000);
+  DebugTriangle(&p2[0], &p2[1], &p2[2], 0x00FF0000);
 
-  Triangle(&p0[0], &p0[1], &p0[2], color);
+  // Triangle(&p0[0], &p0[1], &p0[2], color);
   // Triangle(&p1[0], &p1[1], &p1[2], color);
-  // Triangle(&p2[0], &p2[1], &p2[2], color);
+  Triangle(&p2[0], &p2[1], &p2[2], color);
 }
 
 #endif  // RENDERER_CPP
