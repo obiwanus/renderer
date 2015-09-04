@@ -84,7 +84,6 @@ Line::Line(v2i *p0, v2i *p1, bool32 is_left_side) {
 }
 
 int Line::GetNextX(void) {
-
   if (steep) {
     error += 1.0f;
     if (error >= derror) {
@@ -201,41 +200,56 @@ internal void LoadModelFromFile(char *filename) {
   g_model.is_loaded = true;
 }
 
+inline u32 GetGrayColor(r32 intensity) {
+  u32 Grey = static_cast<u32>(0xFF * intensity);
+  u32 result = Grey << 16 | Grey << 8 | Grey;
+  return result;
+}
+
 internal void Render() {
   if (!g_model.is_loaded) LoadModelFromFile("african_head.model");
 
-  u32 color = 0x00999999;
+  v3 light_direction = {0, 0, -1.0f};
+  light_direction = Normalize(light_direction);
+  v2i p0, p1, p2;
+  int height = g_game_backbuffer.height;
 
   // // Draw model
-  // for (int i = 0; i < g_model.face_count; ++i) {
-  //   Face *face = &g_model.faces[i];
-  //   for (int j = 0; j < 3; ++j) {
-  //     v3 *vert0 = &g_model.vertices[face->e[j] - 1];
-  //     v3 *vert1 = &g_model.vertices[face->e[(j+1) % 3] - 1];
+  for (int i = 0; i < g_model.face_count; ++i) {
+    Face *face = &g_model.faces[i];
 
-  //     int height = g_game_backbuffer.height;
+    v3 *vert0 = &g_model.vertices[face->e[0] - 1];
+    v3 *vert1 = &g_model.vertices[face->e[1] - 1];
+    v3 *vert2 = &g_model.vertices[face->e[2] - 1];
 
-  //     int x0 = static_cast<int>((vert0->x + 1.0f) * height / 2.0f);
-  //     int y0 = static_cast<int>((vert0->y + 1.0f) * height / 2.0f);
+    v3 normal = Normalize(CrossProduct(*vert2 - *vert0, *vert1 - *vert0));
+    r32 intensity = DotProduct(normal, light_direction);
+    if (intensity <= 0)
+      continue;
 
-  //     int x1 = static_cast<int>((vert1->x + 1.0f) * height / 2.0f);
-  //     int y1 = static_cast<int>((vert1->y + 1.0f) * height / 2.0f);
+    p0.x = static_cast<int>((vert0->x + 1.0f) * height / 2.0f);
+    p0.y = static_cast<int>((vert0->y + 1.0f) * height / 2.0f);
 
-  //     Line(x0, y0, x1, y1, color);
-  //   }
-  // }
+    p1.x = static_cast<int>((vert1->x + 1.0f) * height / 2.0f);
+    p1.y = static_cast<int>((vert1->y + 1.0f) * height / 2.0f);
 
-  v2i p0[3] = {{10, 70}, {50, 160}, {70, 100}};
-  v2i p1[3] = {{180, 50}, {150, 1}, {70, 180}};
-  v2i p2[3] = {{180, 150}, {120, 160}, {130, 180}};
+    p2.x = static_cast<int>((vert2->x + 1.0f) * height / 2.0f);
+    p2.y = static_cast<int>((vert2->y + 1.0f) * height / 2.0f);
+
+    Triangle(&p0, &p1, &p2, GetGrayColor(intensity));
+  }
+
+  // v2i p0[3] = {{10, 70}, {50, 160}, {70, 100}};
+  // v2i p1[3] = {{180, 50}, {150, 1}, {70, 180}};
+  // v2i p2[3] = {{180, 150}, {120, 160}, {130, 180}};
 
   // DebugTriangle(&p0[0], &p0[1], &p0[2], 0x00FF0000);
   // DebugTriangle(&p1[0], &p1[1], &p1[2], 0x00FF0000);
-  DebugTriangle(&p2[0], &p2[1], &p2[2], 0x00FF0000);
+  // DebugTriangle(&p2[0], &p2[1], &p2[2], 0x00FF0000);
 
   // Triangle(&p0[0], &p0[1], &p0[2], color);
   // Triangle(&p1[0], &p1[1], &p1[2], color);
-  Triangle(&p2[0], &p2[1], &p2[2], color);
+  // Triangle(&p2[0], &p2[1], &p2[2], color);
 }
 
 #endif  // RENDERER_CPP

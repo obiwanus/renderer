@@ -198,6 +198,39 @@ inline v3 operator-(v3 a) {
   return result;
 }
 
+inline v3 CrossProduct(v3 a, v3 b) {
+  v3 result = {};
+
+  result.x = a.y * b.z - a.z * b.y;
+  result.y = a.z * b.x - a.x * b.z;
+  result.z = a.x * b.y - a.y * b.x;
+
+  return result;
+}
+
+inline r32 DotProduct(v3 vector1, v3 vector2) {
+  r32 result =
+      vector1.x * vector2.x + vector1.y * vector2.y + vector1.z * vector2.z;
+  return result;
+}
+
+inline r32 V3Length(v3 vector) {
+  r32 result =
+      SquareRoot(Square(vector.x) + Square(vector.y) + Square(vector.z));
+  return result;
+}
+
+inline v3 Normalize(v3 vector) {
+  v3 result = {};
+  r32 length = V3Length(vector);
+
+  result.x = vector.x / length;
+  result.y = vector.y / length;
+  result.z = vector.z / length;
+
+  return result;
+}
+
 inline int RoundReal32(r32 value) {
   int result = static_cast<int>(value + 0.5f);
   return result;
