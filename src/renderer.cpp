@@ -19,7 +19,7 @@ inline void SetPixel(int x, int y, u32 color) {
   *Pixel = color;
 }
 
-internal void Line(int x0, int y0, int x1, int y1, u32 color) {
+internal void DebugLine(int x0, int y0, int x1, int y1, u32 color) {
   bool32 steep = false;
   if (Abs(x1 - x0) < Abs(y1 - y0)) {
     steep = true;
@@ -52,6 +52,72 @@ internal void Line(int x0, int y0, int x1, int y1, u32 color) {
   }
 }
 
+struct Line {
+  int x0, y0;
+  int x1, y1;
+  int dx;
+  int dy;
+  int sign_dx;
+  int x;  // output
+  bool32 left_side;
+  bool32 steep;
+  r32 error;
+  r32 derror;
+
+  Line(v2i *p0, v2i *p1, bool32 left_side);
+
+  int GetNextX();
+};
+
+Line::Line(v2i *p0, v2i *p1, bool32 is_left_side) {
+  x0 = p0->x, y0 = p0->y;
+  x1 = p1->x, y1 = p1->y;
+
+  left_side = is_left_side;
+  dx = x1 - x0;
+  dy = y1 - y0;  // always positive
+  steep = Abs(dy) > Abs(dx);
+  derror = Abs(dy) / (r32)Abs(dx);
+  error = 0;
+  sign_dx = (dx > 0) ? 1 : -1;
+  x = x0;
+}
+
+int Line::GetNextX(void) {
+  if (steep) {
+    error += 1.0f;
+    if (error >= derror) {
+      error -= derror;
+      x += sign_dx;
+    }
+  } else {
+    while (error < 0.5f && x < x1) {
+      error += derror;
+      x += sign_dx;
+    }
+    error -= 1.0f;
+  }
+  return x;
+}
+
+internal void HorizontalLine(int x0, int x1, int y, u32 color) {
+  if (x1 < x0) swap_int(&x0, &x1);
+
+  if (x0 < 0) x0 = 0;
+  if (x1 >= g_game_backbuffer.width) x1 = g_game_backbuffer.width - 1;
+  if (y < 0 || y >= g_game_backbuffer.height) return;
+
+  int pitch = g_game_backbuffer.width * g_game_backbuffer.bytes_per_pixel;
+  u8 *row = (u8 *)g_game_backbuffer.memory +
+            (g_game_backbuffer.height - 1) * pitch - pitch * y +
+            x0 * g_game_backbuffer.bytes_per_pixel;
+  u32 *Pixel = (u32 *)row;
+
+  for (int x = x0; x <= x1; ++x) {
+    *Pixel++ = color;
+  }
+}
+
 internal void Triangle(v2i *p0, v2i *p1, v2i *p2, u32 color) {
   // Sort points by y
   if (p0->y > p1->y) swap_pointers(&p0, &p1);
@@ -59,45 +125,28 @@ internal void Triangle(v2i *p0, v2i *p1, v2i *p2, u32 color) {
   if (p0->y > p1->y) swap_pointers(&p0, &p1);
 
   {
-    // Line p0 -> p2, part 1
-    int x0 = p0->x, y0 = p0->y;
-    int x1 = p1->x, y1 = p1->y;
+    // Line p0 -> p1
+    bool32 is_left_side = (p1->x < p2->x);
+    Line line1 = Line(p0, p1, is_left_side);
+    Line line2 = Line(p0, p2, !is_left_side);
+    Line line3 = Line(p1, p2, is_left_side);
 
-    bool32 steep = Abs(x1 - x0) < Abs(y1 - y0);
+    // Bottom half
+    for (int y = p0->y; y < p1->y; ++y) {
+      HorizontalLine(line1.GetNextX(), line2.GetNextX(), y, color);
+    }
 
-    int dx = x1 - x0;
-    int dy = y1 - y0;  // always positive
-    r32 derror = Abs(dx) / (r32)dy;
-    r32 error = 0;
-    int x = x0;
-    int sign_dx = (p0->x < p1->x ? 1 : -1);
-
-    for (int y = y0; y < y1; ++y) {
-      if (steep) {
-        // TODO: left or right oriented
-        while (error <= 0.5f) {
-          error += derror;
-          x += sign_dx;
-        }
-        error -= 1.0f;
-      } else {
-        error += derror;
-        if (error > 0.5f) {
-          x += sign_dx;
-          error -= 1.0f;
-        }
-      }
-      SetPixel(x, y, color);
+    // Top half
+    for (int y = p1->y; y <= p2->y; ++y) {
+      HorizontalLine(line2.GetNextX(), line3.GetNextX(), y, color);
     }
   }
+}
 
-  // for (int y = p1->y; y <= p2->y; ++y) {
-
-  // }
-
-  // RasterizeLine(p0, p1, color);
-  // RasterizeLine(p0, p2, color);
-  // RasterizeLine(p1, p2, color);
+internal void DebugTriangle(v2i *p0, v2i *p1, v2i *p2, u32 color) {
+  DebugLine(p0->x, p0->y, p1->x, p1->y, color);
+  DebugLine(p0->x, p0->y, p2->x, p2->y, color);
+  DebugLine(p1->x, p1->y, p2->x, p2->y, color);
 }
 
 internal void LoadModelFromFile(char *filename) {
@@ -155,7 +204,7 @@ internal void Render() {
 
   u32 color = 0x00999999;
 
-  // Draw model
+  // // Draw model
   // for (int i = 0; i < g_model.face_count; ++i) {
   //   Face *face = &g_model.faces[i];
   //   for (int j = 0; j < 3; ++j) {
@@ -174,13 +223,17 @@ internal void Render() {
   //   }
   // }
 
-  v2i p0[3] = {{10, 70}, {50, 160}, {70, 80}};
+  v2i p0[3] = {{10, 70}, {50, 160}, {70, 100}};
   v2i p1[3] = {{180, 50}, {150, 1}, {70, 180}};
   v2i p2[3] = {{180, 150}, {120, 160}, {130, 180}};
 
+  DebugTriangle(&p0[0], &p0[1], &p0[2], 0x00FF0000);
+  // DebugTriangle(&p1[0], &p1[1], &p1[2], 0x00FF0000);
+  // DebugTriangle(&p2[0], &p2[1], &p2[2], 0x00FF0000);
+
   Triangle(&p0[0], &p0[1], &p0[2], color);
-  Triangle(&p1[0], &p1[1], &p1[2], color);
-  Triangle(&p2[0], &p2[1], &p2[2], color);
+  // Triangle(&p1[0], &p1[1], &p1[2], color);
+  // Triangle(&p2[0], &p2[1], &p2[2], color);
 }
 
 #endif  // RENDERER_CPP
