@@ -91,7 +91,7 @@ int Line::GetNextX(void) {
       x += sign_dx;
     }
   } else {
-    while (error < 0.5f && (x * sign_dx) < (x1 * sign_dx)) {
+    while (error < 0.5f && ((x * sign_dx) < (x1 * sign_dx))) {
       error += derror;
       x += sign_dx;
     }
