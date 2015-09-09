@@ -4,6 +4,11 @@
 #include <math.h>
 #include <memory.h>
 
+inline int RoundReal32(r32 value) {
+  int result = static_cast<int>(value + 0.5f);
+  return result;
+}
+
 union v2 {
   struct {
     r32 x, y;
@@ -131,6 +136,61 @@ union v2i {
   int e[2];
 };
 
+inline v2i operator*(int scalar, v2i a) {
+  v2i result;
+
+  result.x = a.x * scalar;
+  result.y = a.y * scalar;
+
+  return result;
+}
+
+inline v2i operator*(r32 scalar, v2i a) {
+  v2i result;
+
+  result.x = RoundReal32(a.x * scalar);
+  result.y = RoundReal32(a.y * scalar);
+
+  return result;
+}
+
+inline v2i operator*(v2i a, int scalar) { return scalar * a; }
+
+inline v2i operator*(v2i a, r32 scalar) { return scalar * a; }
+
+inline v2i &operator*=(v2i &a, int scalar) {
+  a = a * scalar;
+  return a;
+}
+
+inline v2i operator+(v2i a, v2i b) {
+  v2i result;
+
+  result.x = a.x + b.x;
+  result.y = a.y + b.y;
+
+  return result;
+}
+
+inline v2i &operator+=(v2i &a, v2i b) {
+  a = a + b;
+  return a;
+}
+
+inline v2i operator-(v2i a, v2i b) {
+  v2i result;
+
+  result.x = a.x - b.x;
+  result.y = a.y - b.y;
+
+  return result;
+}
+
+inline v2i &operator-=(v2i &a, v2i b) {
+  a = a - b;
+  return a;
+}
+
 // Vector 3
 
 union v3 {
@@ -228,11 +288,6 @@ inline v3 Normalize(v3 vector) {
   result.y = vector.y / length;
   result.z = vector.z / length;
 
-  return result;
-}
-
-inline int RoundReal32(r32 value) {
-  int result = static_cast<int>(value + 0.5f);
   return result;
 }
 

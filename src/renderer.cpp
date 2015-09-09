@@ -52,55 +52,6 @@ internal void DebugLine(int x0, int y0, int x1, int y1, u32 color) {
   }
 }
 
-struct Line {
-  int x0, y0;
-  int x1, y1;
-  int dx;
-  int dy;
-  int sign_dx;
-  int x;  // output
-  bool32 left_side;
-  bool32 steep;
-  r32 error;
-  r32 derror;
-
-  Line(v2i *p0, v2i *p1, bool32 left_side);
-
-  int GetNextX();
-};
-
-Line::Line(v2i *p0, v2i *p1, bool32 is_left_side) {
-  x0 = p0->x, y0 = p0->y;
-  x1 = p1->x, y1 = p1->y;
-
-  left_side = is_left_side;
-  dx = x1 - x0;
-  dy = y1 - y0;  // always positive
-  steep = Abs(dy) > Abs(dx);
-  derror = Abs(dy) / (r32)Abs(dx);
-  error = 0;
-  sign_dx = (dx > 0) ? 1 : -1;
-  x = x0;
-}
-
-int Line::GetNextX(void) {
-  if (steep) {
-    error += 1.0f;
-    if (error >= derror) {
-      error -= derror;
-      x += sign_dx;
-    }
-  } else {
-    while (error < 0.5f && ((x * sign_dx) < (x1 * sign_dx))) {
-      error += derror;
-      x += sign_dx;
-    }
-    error -= 1.0f;
-  }
-
-  return x;
-}
-
 internal void HorizontalLine(int x0, int x1, int y, u32 color) {
   if (x1 < x0) swap_int(&x0, &x1);
 
@@ -125,23 +76,40 @@ internal void Triangle(v2i *p0, v2i *p1, v2i *p2, u32 color) {
   if (p1->y > p2->y) swap_pointers(&p1, &p2);
   if (p0->y > p1->y) swap_pointers(&p0, &p1);
 
-  {
-    // Line p0 -> p1
-    bool32 is_left_side = (p1->x < p2->x);
-    Line line1 = Line(p0, p1, is_left_side);
-    Line line2 = Line(p0, p2, !is_left_side);
-    Line line3 = Line(p1, p2, is_left_side);
+  v2i short_side = *p1 - *p0;
+  v2i long_side = *p2 - *p0;
+  int total_height = long_side.y;
+  int segment_height = 0;
 
-    // Bottom half
+  // Bottom half
+  segment_height = p1->y - p0->y;
+  if (segment_height) {
     for (int y = p0->y; y < p1->y; ++y) {
-      HorizontalLine(line1.GetNextX(), line2.GetNextX(), y, color);
-    }
-
-    // Top half
-    for (int y = p1->y; y <= p2->y; ++y) {
-      HorizontalLine(line2.GetNextX(), line3.GetNextX(), y, color);
+      r32 segment_share = static_cast<r32>(y - p0->y) / segment_height;
+      int x1 = (short_side * segment_share).x + p0->x;
+      r32 total_share = static_cast<r32>(y - p0->y) / total_height;
+      int x2 = (long_side * total_share).x + p0->x;
+      HorizontalLine(x1, x2, y, color);
     }
   }
+
+  // Top half
+  short_side = *p2 - *p1;
+  segment_height = short_side.y;
+  if (segment_height) {
+    for (int y = p1->y; y <= p2->y; ++y) {
+      r32 segment_share = static_cast<r32>(y - p1->y) / segment_height;
+      int x1 = (short_side * segment_share).x + p1->x;
+      r32 total_share = static_cast<r32>(y - p0->y) / total_height;
+      int x2 = (long_side * total_share).x + p0->x;
+      HorizontalLine(x1, x2, y, color);
+    }
+  }
+
+  // // Top half
+  // for (int y = p1->y; y <= p2->y; ++y) {
+  //   HorizontalLine(line2.GetNextX(), line3.GetNextX(), y, color);
+  // }
 }
 
 internal void DebugTriangle(v2i *p0, v2i *p1, v2i *p2, u32 color) {
@@ -214,7 +182,7 @@ internal void Render() {
   v2i p0, p1, p2;
   int height = g_game_backbuffer.height;
 
-  // // Draw model
+  // Draw model
   for (int i = 0; i < g_model.face_count; ++i) {
     Face *face = &g_model.faces[i];
 
@@ -239,6 +207,7 @@ internal void Render() {
     Triangle(&p0, &p1, &p2, GetGrayColor(intensity));
   }
 
+  // u32 color = 0x00AAAAAA;
   // v2i p0[3] = {{10, 70}, {50, 160}, {70, 100}};
   // v2i p1[3] = {{180, 50}, {150, 1}, {70, 180}};
   // v2i p2[3] = {{180, 150}, {120, 160}, {130, 180}};
