@@ -76,40 +76,21 @@ internal void Triangle(v2i *p0, v2i *p1, v2i *p2, u32 color) {
   if (p1->y > p2->y) swap_pointers(&p1, &p2);
   if (p0->y > p1->y) swap_pointers(&p0, &p1);
 
-  v2i short_side = *p1 - *p0;
   v2i long_side = *p2 - *p0;
   int total_height = long_side.y;
   int segment_height = 0;
 
-  // Bottom half
-  segment_height = p1->y - p0->y;
-  if (segment_height) {
-    for (int y = p0->y; y < p1->y; ++y) {
-      r32 segment_share = static_cast<r32>(y - p0->y) / segment_height;
-      int x1 = (short_side * segment_share).x + p0->x;
-      r32 total_share = static_cast<r32>(y - p0->y) / total_height;
-      int x2 = (long_side * total_share).x + p0->x;
-      HorizontalLine(x1, x2, y, color);
-    }
+  for (int y = p0->y; y <= p2->y; ++y) {
+    bool32 top_half = (y > p1->y) || (p0->y == p1->y);
+    v2i short_side = top_half ? (*p2 - *p1) : (*p1 - *p0);
+    int x0 = (top_half ? p1->x : p0->x);
+    int y0 = (top_half ? p1->y : p0->y);
+    r32 segment_share = static_cast<r32>(y - y0) / short_side.y;
+    r32 total_share = static_cast<r32>(y - p0->y) / total_height;
+    int x1 = (short_side * segment_share).x + x0;
+    int x2 = (long_side * total_share).x + p0->x;
+    HorizontalLine(x1, x2, y, color);
   }
-
-  // Top half
-  short_side = *p2 - *p1;
-  segment_height = short_side.y;
-  if (segment_height) {
-    for (int y = p1->y; y <= p2->y; ++y) {
-      r32 segment_share = static_cast<r32>(y - p1->y) / segment_height;
-      int x1 = (short_side * segment_share).x + p1->x;
-      r32 total_share = static_cast<r32>(y - p0->y) / total_height;
-      int x2 = (long_side * total_share).x + p0->x;
-      HorizontalLine(x1, x2, y, color);
-    }
-  }
-
-  // // Top half
-  // for (int y = p1->y; y <= p2->y; ++y) {
-  //   HorizontalLine(line2.GetNextX(), line3.GetNextX(), y, color);
-  // }
 }
 
 internal void DebugTriangle(v2i *p0, v2i *p1, v2i *p2, u32 color) {
@@ -192,8 +173,7 @@ internal void Render() {
 
     v3 normal = Normalize(CrossProduct(*vert2 - *vert0, *vert1 - *vert0));
     r32 intensity = DotProduct(normal, light_direction);
-    if (intensity <= 0)
-      continue;
+    if (intensity <= 0) continue;
 
     p0.x = static_cast<int>((vert0->x + 1.0f) * height / 2.0f);
     p0.y = static_cast<int>((vert0->y + 1.0f) * height / 2.0f);
