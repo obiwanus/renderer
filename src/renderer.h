@@ -11,6 +11,8 @@ struct GameOffscreenBuffer {
   int bytes_per_pixel;
   int max_width;  // We'll only allocate this much
   int max_height;
+  int *z_buffer;
+  bool32 is_initialized;
 };
 
 struct FileReadResult {

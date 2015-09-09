@@ -2,6 +2,7 @@
 #define RENDERER_CPP
 
 #include <stdio.h>
+#include <limits.h>
 
 global Model g_model;
 
@@ -52,25 +53,7 @@ internal void DebugLine(int x0, int y0, int x1, int y1, u32 color) {
   }
 }
 
-internal void HorizontalLine(int x0, int x1, int y, u32 color) {
-  if (x1 < x0) swap_int(&x0, &x1);
-
-  if (x0 < 0) x0 = 0;
-  if (x1 >= g_game_backbuffer.width) x1 = g_game_backbuffer.width - 1;
-  if (y < 0 || y >= g_game_backbuffer.height) return;
-
-  int pitch = g_game_backbuffer.width * g_game_backbuffer.bytes_per_pixel;
-  u8 *row = (u8 *)g_game_backbuffer.memory +
-            (g_game_backbuffer.height - 1) * pitch - pitch * y +
-            x0 * g_game_backbuffer.bytes_per_pixel;
-  u32 *Pixel = (u32 *)row;
-
-  for (int x = x0; x <= x1; ++x) {
-    *Pixel++ = color;
-  }
-}
-
-internal void Triangle(v3i *p0, v3i *p1, v3i *p2, u32 color) {
+internal void Triangle(v3i *p0, v3i *p1, v3i *p2, u32 color, int *z_buffer) {
   // Sort points by y
   if (p0->y > p1->y) swap_pointers(&p0, &p1);
   if (p1->y > p2->y) swap_pointers(&p1, &p2);
@@ -90,7 +73,34 @@ internal void Triangle(v3i *p0, v3i *p1, v3i *p2, u32 color) {
     v3i a = short_side * segment_share + (top_half ? *p1 : *p0);
     v3i b = long_side * total_share + *p0;
 
-    HorizontalLine(a.x, b.x, y, color);
+    // Draw horizontal line
+    {
+      if (a.x > b.x) swap_pointers(&a, &b);
+
+      int x0 = a.x;
+      int x1 = b.x;
+      if (x0 < 0) x0 = 0;
+      if (x1 >= g_game_backbuffer.width) x1 = g_game_backbuffer.width - 1;
+      if (y < 0 || y >= g_game_backbuffer.height) continue;
+
+      int pitch = g_game_backbuffer.width * g_game_backbuffer.bytes_per_pixel;
+      u8 *row = (u8 *)g_game_backbuffer.memory +
+                (g_game_backbuffer.height - 1) * pitch - pitch * y +
+                x0 * g_game_backbuffer.bytes_per_pixel;
+      u32 *Pixel = (u32 *)row;
+
+      for (int x = x0; x <= x1; ++x) {
+        r32 share =
+            (b.x == a.x) ? 1.0f : static_cast<r32>(x - a.x) / (b.x - a.x);
+        v3i result = a + share * (b - a);
+        int index = result.y * g_game_backbuffer.width + result.x;
+        if (z_buffer[index] < result.z) {
+          z_buffer[index] = result.z;
+          *Pixel = color;
+        }
+        Pixel++;
+      }
+    }
   }
 }
 
@@ -157,12 +167,20 @@ inline u32 GetGrayColor(r32 intensity) {
 }
 
 internal void Render() {
-  if (!g_model.is_loaded) LoadModelFromFile("african_head.model");
-
   v3 light_direction = {0, 0, -1.0f};
   light_direction = Normalize(light_direction);
   v3i p0, p1, p2;
   int height = g_game_backbuffer.height;
+  int width = g_game_backbuffer.width;
+  if (!g_model.is_loaded) LoadModelFromFile("african_head.model");
+  if (!g_game_backbuffer.is_initialized) {
+    g_game_backbuffer.z_buffer = (int *)VirtualAlloc(
+        0, width * height * sizeof(int), MEM_COMMIT, PAGE_READWRITE);
+    for (int i = 0; i < width * height; ++i) {
+      g_game_backbuffer.z_buffer[i] = INT_MIN;
+    }
+    g_game_backbuffer.is_initialized = true;
+  }
 
   // Draw model
   for (int i = 0; i < g_model.face_count; ++i) {
@@ -188,7 +206,8 @@ internal void Render() {
     p2.y = static_cast<int>((vert2->y + 1.0f) * height / 2.0f);
     p2.z = static_cast<int>((vert2->z + 1.0f) * height / 2.0f);
 
-    Triangle(&p0, &p1, &p2, GetGrayColor(intensity));
+    Triangle(&p0, &p1, &p2, GetGrayColor(intensity),
+             g_game_backbuffer.z_buffer);
   }
 
   // u32 color = 0x00AAAAAA;
