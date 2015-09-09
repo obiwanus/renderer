@@ -172,8 +172,8 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   QueryPerformanceFrequency(&g_performance_frequency);
 
   if (RegisterClass(&window_class)) {
-    const int window_width = 1024;
-    const int window_height = 768;
+    const int window_width = 1000;
+    const int window_height = 1000;
 
     HWND window = CreateWindow(window_class.lpszClassName, 0,
                                WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT,

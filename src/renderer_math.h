@@ -191,6 +191,74 @@ inline v2i &operator-=(v2i &a, v2i b) {
   return a;
 }
 
+// Integer vector 3
+
+union v3i {
+  struct {
+    int x, y, z;
+  };
+  int e[3];
+};
+
+inline v3i operator*(int scalar, v3i a) {
+  v3i result;
+
+  result.x = a.x * scalar;
+  result.y = a.y * scalar;
+  result.z = a.z * scalar;
+
+  return result;
+}
+
+inline v3i operator*(r32 scalar, v3i a) {
+  v3i result;
+
+  result.x = RoundReal32(a.x * scalar);
+  result.y = RoundReal32(a.y * scalar);
+  result.z = RoundReal32(a.z * scalar);
+
+  return result;
+}
+
+inline v3i operator*(v3i a, int scalar) { return scalar * a; }
+
+inline v3i operator*(v3i a, r32 scalar) { return scalar * a; }
+
+inline v3i &operator*=(v3i &a, int scalar) {
+  a = a * scalar;
+  return a;
+}
+
+inline v3i operator+(v3i a, v3i b) {
+  v3i result;
+
+  result.x = a.x + b.x;
+  result.y = a.y + b.y;
+  result.z = a.z + b.z;
+
+  return result;
+}
+
+inline v3i &operator+=(v3i &a, v3i b) {
+  a = a + b;
+  return a;
+}
+
+inline v3i operator-(v3i a, v3i b) {
+  v3i result;
+
+  result.x = a.x - b.x;
+  result.y = a.y - b.y;
+  result.z = a.z - b.z;
+
+  return result;
+}
+
+inline v3i &operator-=(v3i &a, v3i b) {
+  a = a - b;
+  return a;
+}
+
 // Vector 3
 
 union v3 {

@@ -70,26 +70,27 @@ internal void HorizontalLine(int x0, int x1, int y, u32 color) {
   }
 }
 
-internal void Triangle(v2i *p0, v2i *p1, v2i *p2, u32 color) {
+internal void Triangle(v3i *p0, v3i *p1, v3i *p2, u32 color) {
   // Sort points by y
   if (p0->y > p1->y) swap_pointers(&p0, &p1);
   if (p1->y > p2->y) swap_pointers(&p1, &p2);
   if (p0->y > p1->y) swap_pointers(&p0, &p1);
 
-  v2i long_side = *p2 - *p0;
+  v3i long_side = *p2 - *p0;
   int total_height = long_side.y;
   int segment_height = 0;
 
   for (int y = p0->y; y <= p2->y; ++y) {
     bool32 top_half = (y > p1->y) || (p0->y == p1->y);
-    v2i short_side = top_half ? (*p2 - *p1) : (*p1 - *p0);
-    int x0 = (top_half ? p1->x : p0->x);
+    v3i short_side = top_half ? (*p2 - *p1) : (*p1 - *p0);
     int y0 = (top_half ? p1->y : p0->y);
     r32 segment_share = static_cast<r32>(y - y0) / short_side.y;
     r32 total_share = static_cast<r32>(y - p0->y) / total_height;
-    int x1 = (short_side * segment_share).x + x0;
-    int x2 = (long_side * total_share).x + p0->x;
-    HorizontalLine(x1, x2, y, color);
+
+    v3i a = short_side * segment_share + (top_half ? *p1 : *p0);
+    v3i b = long_side * total_share + *p0;
+
+    HorizontalLine(a.x, b.x, y, color);
   }
 }
 
@@ -160,7 +161,7 @@ internal void Render() {
 
   v3 light_direction = {0, 0, -1.0f};
   light_direction = Normalize(light_direction);
-  v2i p0, p1, p2;
+  v3i p0, p1, p2;
   int height = g_game_backbuffer.height;
 
   // Draw model
@@ -177,12 +178,15 @@ internal void Render() {
 
     p0.x = static_cast<int>((vert0->x + 1.0f) * height / 2.0f);
     p0.y = static_cast<int>((vert0->y + 1.0f) * height / 2.0f);
+    p0.z = static_cast<int>((vert0->z + 1.0f) * height / 2.0f);
 
     p1.x = static_cast<int>((vert1->x + 1.0f) * height / 2.0f);
     p1.y = static_cast<int>((vert1->y + 1.0f) * height / 2.0f);
+    p1.z = static_cast<int>((vert1->z + 1.0f) * height / 2.0f);
 
     p2.x = static_cast<int>((vert2->x + 1.0f) * height / 2.0f);
     p2.y = static_cast<int>((vert2->y + 1.0f) * height / 2.0f);
+    p2.z = static_cast<int>((vert2->z + 1.0f) * height / 2.0f);
 
     Triangle(&p0, &p1, &p2, GetGrayColor(intensity));
   }
