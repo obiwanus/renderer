@@ -187,25 +187,22 @@ internal void Render() {
   for (int i = 0; i < g_model.face_count; ++i) {
     Face *face = &g_model.faces[i];
 
-    v3 *vert0 = &g_model.vertices[face->v[0] - 1];
-    v3 *vert1 = &g_model.vertices[face->v[1] - 1];
-    v3 *vert2 = &g_model.vertices[face->v[2] - 1];
+    v3 vert[3];
+    // Look up actual coordinates from the model
+    for (int j = 0; j < 3; ++j) {
+      vert[j] = g_model.vertices[face->v[j] - 1];
+    }
 
-    v3 normal = Normalize(CrossProduct(*vert2 - *vert0, *vert1 - *vert0));
+    v3 normal = Normalize(CrossProduct(vert[2] - vert[0], vert[1] - vert[0]));
     r32 intensity = DotProduct(normal, light_direction);
     if (intensity <= 0) continue;
 
-    p[0].x = static_cast<int>((vert0->x + 1.0f) * height / 2.0f);
-    p[0].y = static_cast<int>((vert0->y + 1.0f) * height / 2.0f);
-    p[0].z = static_cast<int>((vert0->z + 1.0f) * height / 2.0f);
-
-    p[1].x = static_cast<int>((vert1->x + 1.0f) * height / 2.0f);
-    p[1].y = static_cast<int>((vert1->y + 1.0f) * height / 2.0f);
-    p[1].z = static_cast<int>((vert1->z + 1.0f) * height / 2.0f);
-
-    p[2].x = static_cast<int>((vert2->x + 1.0f) * height / 2.0f);
-    p[2].y = static_cast<int>((vert2->y + 1.0f) * height / 2.0f);
-    p[2].z = static_cast<int>((vert2->z + 1.0f) * height / 2.0f);
+    // Adjust the vertices to fit the window size
+    for (int j = 0; j < 3; ++j) {
+      for (int k = 0; k < 3; ++k) {
+        p[j].e[k] = static_cast<int>((vert[j].e[k] + 1.0f) * height / 2.0f);
+      }
+    }
 
     Triangle(p, GetGrayColor(intensity), g_game_backbuffer.z_buffer);
   }

@@ -265,7 +265,7 @@ union v3 {
   struct {
     r32 x, y, z;
   };
-  r32 E[3];
+  r32 e[3];
 };
 
 inline v3 operator*(r32 scalar, v3 a) {
