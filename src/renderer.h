@@ -20,15 +20,12 @@ struct FileReadResult {
   u64 memory_size;
 };
 
-union Face {
+struct Face {
   // Three vertices
-  struct {
-    int v1;
-    int v2;
-    int v3;
-  };
+  int v[3];
 
-  int e[3];
+  // Texture coordinates
+  int uvs[3];
 };
 
 struct Model {

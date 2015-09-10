@@ -53,7 +53,11 @@ internal void DebugLine(int x0, int y0, int x1, int y1, u32 color) {
   }
 }
 
-internal void Triangle(v3i *p0, v3i *p1, v3i *p2, u32 color, int *z_buffer) {
+internal void Triangle(v3i *p, u32 color, int *z_buffer) {
+  v3i *p0 = &p[0];
+  v3i *p1 = &p[1];
+  v3i *p2 = &p[2];
+
   // Sort points by y
   if (p0->y > p1->y) swap_pointers(&p0, &p1);
   if (p1->y > p2->y) swap_pointers(&p1, &p2);
@@ -146,12 +150,9 @@ internal void LoadModelFromFile(char *filename) {
     } else if (strcmp(line_type, "f") == 0) {
       char v1[30], v2[30], v3[30];  // vertex data
       sscanf_s(buffer, "f %s %s %s", v1, 30, v2, 30, v3, 30);
-      sscanf_s(v1, "%d", &f->v1);
-      sscanf_s(v2, "%d", &f->v2);
-      sscanf_s(v3, "%d", &f->v3);
-      if (f->v3 == 0) {
-        int a = 0;
-      }
+      sscanf_s(v1, "%d/%d", &f->v[0], &f->uvs[0]);
+      sscanf_s(v2, "%d/%d", &f->v[1], &f->uvs[1]);
+      sscanf_s(v3, "%d/%d", &f->v[2], &f->uvs[2]);
       f++;
     }
   }
@@ -169,7 +170,7 @@ inline u32 GetGrayColor(r32 intensity) {
 internal void Render() {
   v3 light_direction = {0, 0, -1.0f};
   light_direction = Normalize(light_direction);
-  v3i p0, p1, p2;
+  v3i p[3];
   int height = g_game_backbuffer.height;
   int width = g_game_backbuffer.width;
   if (!g_model.is_loaded) LoadModelFromFile("african_head.model");
@@ -186,28 +187,27 @@ internal void Render() {
   for (int i = 0; i < g_model.face_count; ++i) {
     Face *face = &g_model.faces[i];
 
-    v3 *vert0 = &g_model.vertices[face->e[0] - 1];
-    v3 *vert1 = &g_model.vertices[face->e[1] - 1];
-    v3 *vert2 = &g_model.vertices[face->e[2] - 1];
+    v3 *vert0 = &g_model.vertices[face->v[0] - 1];
+    v3 *vert1 = &g_model.vertices[face->v[1] - 1];
+    v3 *vert2 = &g_model.vertices[face->v[2] - 1];
 
     v3 normal = Normalize(CrossProduct(*vert2 - *vert0, *vert1 - *vert0));
     r32 intensity = DotProduct(normal, light_direction);
     if (intensity <= 0) continue;
 
-    p0.x = static_cast<int>((vert0->x + 1.0f) * height / 2.0f);
-    p0.y = static_cast<int>((vert0->y + 1.0f) * height / 2.0f);
-    p0.z = static_cast<int>((vert0->z + 1.0f) * height / 2.0f);
+    p[0].x = static_cast<int>((vert0->x + 1.0f) * height / 2.0f);
+    p[0].y = static_cast<int>((vert0->y + 1.0f) * height / 2.0f);
+    p[0].z = static_cast<int>((vert0->z + 1.0f) * height / 2.0f);
 
-    p1.x = static_cast<int>((vert1->x + 1.0f) * height / 2.0f);
-    p1.y = static_cast<int>((vert1->y + 1.0f) * height / 2.0f);
-    p1.z = static_cast<int>((vert1->z + 1.0f) * height / 2.0f);
+    p[1].x = static_cast<int>((vert1->x + 1.0f) * height / 2.0f);
+    p[1].y = static_cast<int>((vert1->y + 1.0f) * height / 2.0f);
+    p[1].z = static_cast<int>((vert1->z + 1.0f) * height / 2.0f);
 
-    p2.x = static_cast<int>((vert2->x + 1.0f) * height / 2.0f);
-    p2.y = static_cast<int>((vert2->y + 1.0f) * height / 2.0f);
-    p2.z = static_cast<int>((vert2->z + 1.0f) * height / 2.0f);
+    p[2].x = static_cast<int>((vert2->x + 1.0f) * height / 2.0f);
+    p[2].y = static_cast<int>((vert2->y + 1.0f) * height / 2.0f);
+    p[2].z = static_cast<int>((vert2->z + 1.0f) * height / 2.0f);
 
-    Triangle(&p0, &p1, &p2, GetGrayColor(intensity),
-             g_game_backbuffer.z_buffer);
+    Triangle(p, GetGrayColor(intensity), g_game_backbuffer.z_buffer);
   }
 
   // u32 color = 0x00AAAAAA;
