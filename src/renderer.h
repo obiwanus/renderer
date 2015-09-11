@@ -36,4 +36,7 @@ struct Model {
 
   Face *faces;
   int face_count;
+
+  v2i *texture_coords;
+  int tc_count;
 };

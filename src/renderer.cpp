@@ -129,6 +129,8 @@ internal void LoadModelFromFile(char *filename) {
       g_model.vert_count++;
     } else if (strcmp(line_type, "f") == 0) {
       g_model.face_count++;
+    } else if (strcmp(line_type, "vt") == 0) {
+      g_model.tc_count++;
     }
   }
 
@@ -137,23 +139,37 @@ internal void LoadModelFromFile(char *filename) {
       0, sizeof(v3) * g_model.vert_count, MEM_COMMIT, PAGE_READWRITE));
   g_model.faces = static_cast<Face *>(VirtualAlloc(
       0, sizeof(Face) * g_model.face_count, MEM_COMMIT, PAGE_READWRITE));
+  g_model.texture_coords = static_cast<v2i *>(VirtualAlloc(
+      0, sizeof(v2i) * g_model.tc_count, MEM_COMMIT, PAGE_READWRITE));
   v3 *v = g_model.vertices;
   Face *f = g_model.faces;
+  v2i *vt = g_model.texture_coords;
 
   // Fill model data
   fseek(file, 0, SEEK_SET);
   while (fgets(buffer, kMaxChars, file)) {
     sscanf_s(buffer, "%s ", line_type, 3);
     if (strcmp(line_type, "v") == 0) {
+      // Vertices
       sscanf_s(buffer, "v %f %f %f", &v->x, &v->y, &v->z);
       v++;
     } else if (strcmp(line_type, "f") == 0) {
+      // Faces
       char v1[30], v2[30], v3[30];  // vertex data
       sscanf_s(buffer, "f %s %s %s", v1, 30, v2, 30, v3, 30);
       sscanf_s(v1, "%d/%d", &f->v[0], &f->uvs[0]);
       sscanf_s(v2, "%d/%d", &f->v[1], &f->uvs[1]);
       sscanf_s(v3, "%d/%d", &f->v[2], &f->uvs[2]);
       f++;
+    } else if (strcmp(line_type, "vt") == 0) {
+      // Texture coordinates
+      r32 x, y;
+      sscanf_s(buffer, "vt %f %f", &x, &y);
+      int texture_width = 1024;
+      int texture_height = 1024;
+      vt->x = (int)(x * texture_width);
+      vt->y = (int)(y * texture_height);
+      vt++;
     }
   }
 
@@ -192,6 +208,8 @@ internal void Render() {
     for (int j = 0; j < 3; ++j) {
       vert[j] = g_model.vertices[face->v[j] - 1];
     }
+
+    // TODO: load texture coordinates, pass them on to the triangle
 
     v3 normal = Normalize(CrossProduct(vert[2] - vert[0], vert[1] - vert[0]));
     r32 intensity = DotProduct(normal, light_direction);
