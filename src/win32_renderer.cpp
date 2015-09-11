@@ -1,5 +1,9 @@
 #include "renderer_platform.h"
 
+// Libs
+#include "../libs/tgaimage.h"
+#include "../libs/tgaimage.cpp"
+
 #include "renderer.h"
 #include <windows.h>
 #include <intrin.h>
@@ -12,8 +16,6 @@ global BITMAPINFO g_bitmap_info;
 global LARGE_INTEGER g_performance_frequency;
 
 global GameOffscreenBuffer g_game_backbuffer;
-
-#include "renderer.cpp"
 
 FileReadResult PlatformReadEntireFile(char *filename) {
   FileReadResult result = {};
@@ -48,6 +50,9 @@ FileReadResult PlatformReadEntireFile(char *filename) {
 
   return result;
 }
+
+// Above this line are the platform service functions
+#include "renderer.cpp"
 
 internal void Win32UpdateWindow(HDC hdc) {
   StretchDIBits(

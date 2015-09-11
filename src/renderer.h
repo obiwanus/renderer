@@ -39,4 +39,6 @@ struct Model {
 
   v2i *texture_coords;
   int tc_count;
+
+  TGAImage *texture;
 };

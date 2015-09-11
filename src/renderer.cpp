@@ -114,67 +114,73 @@ internal void DebugTriangle(v2i *p0, v2i *p1, v2i *p2, u32 color) {
   DebugLine(p1->x, p1->y, p2->x, p2->y, color);
 }
 
-internal void LoadModelFromFile(char *filename) {
-  FILE *file;
-  fopen_s(&file, filename, "rb");
+internal void LoadModelFromFile(char *filename, char *texture_filename) {
+  // Load texture
+  g_model.texture = (TGAImage *) new TGAImage();
+  g_model.texture->read_tga_file(texture_filename);
+  g_model.texture->flip_vertically();
 
-  const int kMaxChars = 200;
-  char buffer[kMaxChars];
-  char line_type[3];
+  // Load model
+  {
+    FILE *model_file;
+    fopen_s(&model_file, filename, "rb");
 
-  // Count vertices and faces
-  while (fgets(buffer, kMaxChars, file)) {
-    sscanf_s(buffer, "%s ", line_type, 3);
-    if (strcmp(line_type, "v") == 0) {
-      g_model.vert_count++;
-    } else if (strcmp(line_type, "f") == 0) {
-      g_model.face_count++;
-    } else if (strcmp(line_type, "vt") == 0) {
-      g_model.tc_count++;
+    const int kMaxChars = 200;
+    char buffer[kMaxChars];
+    char line_type[3];
+
+    // Count vertices and faces
+    while (fgets(buffer, kMaxChars, model_file)) {
+      sscanf_s(buffer, "%s ", line_type, 3);
+      if (strcmp(line_type, "v") == 0) {
+        g_model.vert_count++;
+      } else if (strcmp(line_type, "f") == 0) {
+        g_model.face_count++;
+      } else if (strcmp(line_type, "vt") == 0) {
+        g_model.tc_count++;
+      }
     }
-  }
 
-  // Allocate space for data
-  g_model.vertices = static_cast<v3 *>(VirtualAlloc(
-      0, sizeof(v3) * g_model.vert_count, MEM_COMMIT, PAGE_READWRITE));
-  g_model.faces = static_cast<Face *>(VirtualAlloc(
-      0, sizeof(Face) * g_model.face_count, MEM_COMMIT, PAGE_READWRITE));
-  g_model.texture_coords = static_cast<v2i *>(VirtualAlloc(
-      0, sizeof(v2i) * g_model.tc_count, MEM_COMMIT, PAGE_READWRITE));
-  v3 *v = g_model.vertices;
-  Face *f = g_model.faces;
-  v2i *vt = g_model.texture_coords;
+    // Allocate space for data
+    g_model.vertices = static_cast<v3 *>(VirtualAlloc(
+        0, sizeof(v3) * g_model.vert_count, MEM_COMMIT, PAGE_READWRITE));
+    g_model.faces = static_cast<Face *>(VirtualAlloc(
+        0, sizeof(Face) * g_model.face_count, MEM_COMMIT, PAGE_READWRITE));
+    g_model.texture_coords = static_cast<v2i *>(VirtualAlloc(
+        0, sizeof(v2i) * g_model.tc_count, MEM_COMMIT, PAGE_READWRITE));
+    v3 *v = g_model.vertices;
+    Face *f = g_model.faces;
+    v2i *vt = g_model.texture_coords;
 
-  // Fill model data
-  fseek(file, 0, SEEK_SET);
-  while (fgets(buffer, kMaxChars, file)) {
-    sscanf_s(buffer, "%s ", line_type, 3);
-    if (strcmp(line_type, "v") == 0) {
-      // Vertices
-      sscanf_s(buffer, "v %f %f %f", &v->x, &v->y, &v->z);
-      v++;
-    } else if (strcmp(line_type, "f") == 0) {
-      // Faces
-      char v1[30], v2[30], v3[30];  // vertex data
-      sscanf_s(buffer, "f %s %s %s", v1, 30, v2, 30, v3, 30);
-      sscanf_s(v1, "%d/%d", &f->v[0], &f->uvs[0]);
-      sscanf_s(v2, "%d/%d", &f->v[1], &f->uvs[1]);
-      sscanf_s(v3, "%d/%d", &f->v[2], &f->uvs[2]);
-      f++;
-    } else if (strcmp(line_type, "vt") == 0) {
-      // Texture coordinates
-      r32 x, y;
-      sscanf_s(buffer, "vt %f %f", &x, &y);
-      int texture_width = 1024;
-      int texture_height = 1024;
-      vt->x = (int)(x * texture_width);
-      vt->y = (int)(y * texture_height);
-      vt++;
+    // Fill model data
+    fseek(model_file, 0, SEEK_SET);
+    while (fgets(buffer, kMaxChars, model_file)) {
+      sscanf_s(buffer, "%s ", line_type, 3);
+      if (strcmp(line_type, "v") == 0) {
+        // Vertices
+        sscanf_s(buffer, "v %f %f %f", &v->x, &v->y, &v->z);
+        v++;
+      } else if (strcmp(line_type, "f") == 0) {
+        // Faces
+        char v1[30], v2[30], v3[30];  // vertex data
+        sscanf_s(buffer, "f %s %s %s", v1, 30, v2, 30, v3, 30);
+        sscanf_s(v1, "%d/%d", &f->v[0], &f->uvs[0]);
+        sscanf_s(v2, "%d/%d", &f->v[1], &f->uvs[1]);
+        sscanf_s(v3, "%d/%d", &f->v[2], &f->uvs[2]);
+        f++;
+      } else if (strcmp(line_type, "vt") == 0) {
+        // Texture coordinates
+        r32 x, y;
+        sscanf_s(buffer, "vt %f %f", &x, &y);
+        vt->x = (int)(x * g_model.texture->width);
+        vt->y = (int)(y * g_model.texture->height);
+        vt++;
+      }
     }
-  }
 
-  fclose(file);
-  g_model.is_loaded = true;
+    fclose(model_file);
+    g_model.is_loaded = true;
+  }
 }
 
 inline u32 GetGrayColor(r32 intensity) {
@@ -189,10 +195,11 @@ internal void Render() {
   v3i p[3];
   int height = g_game_backbuffer.height;
   int width = g_game_backbuffer.width;
-  if (!g_model.is_loaded) LoadModelFromFile("african_head.model");
+  if (!g_model.is_loaded)
+    LoadModelFromFile("african_head.model", "african_head_diffuse.tga");
   if (!g_game_backbuffer.is_initialized) {
     g_game_backbuffer.z_buffer = (int *)VirtualAlloc(
-        0, width * height * sizeof(int), MEM_COMMIT, PAGE_READWRITE);
+        0, 4 * width * height * sizeof(int), MEM_COMMIT, PAGE_READWRITE);
     for (int i = 0; i < width * height; ++i) {
       g_game_backbuffer.z_buffer[i] = INT_MIN;
     }
