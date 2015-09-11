@@ -53,15 +53,24 @@ internal void DebugLine(int x0, int y0, int x1, int y1, u32 color) {
   }
 }
 
-internal void Triangle(v3i *p, u32 color, int *z_buffer) {
+internal void Triangle(v3i *p, v2i *uv, r32 intensity, TGAImage *texture,
+                       int *z_buffer) {
   v3i *p0 = &p[0];
   v3i *p1 = &p[1];
   v3i *p2 = &p[2];
+
+  v2i *uv0 = &uv[0];
+  v2i *uv1 = &uv[1];
+  v2i *uv2 = &uv[2];
 
   // Sort points by y
   if (p0->y > p1->y) swap_pointers(&p0, &p1);
   if (p1->y > p2->y) swap_pointers(&p1, &p2);
   if (p0->y > p1->y) swap_pointers(&p0, &p1);
+
+  if (uv0->y > uv1->y) swap_pointers(&uv0, &uv1);
+  if (uv1->y > uv2->y) swap_pointers(&uv1, &uv2);
+  if (uv0->y > uv1->y) swap_pointers(&uv0, &uv1);
 
   v3i long_side = *p2 - *p0;
   int total_height = long_side.y;
@@ -74,12 +83,21 @@ internal void Triangle(v3i *p, u32 color, int *z_buffer) {
     r32 segment_share = static_cast<r32>(y - y0) / short_side.y;
     r32 total_share = static_cast<r32>(y - p0->y) / total_height;
 
+    // Model vectors
     v3i a = short_side * segment_share + (top_half ? *p1 : *p0);
     v3i b = long_side * total_share + *p0;
 
+    // Texture vectors
+    v2i uv_a = top_half ? *uv1 + (*uv2 - *uv1) * segment_share
+                        : *uv0 + (*uv1 - *uv0) * segment_share;
+    v2i uv_b = *uv0 + (*uv2 - *uv0) * total_share;
+
     // Draw horizontal line
     {
-      if (a.x > b.x) swap_pointers(&a, &b);
+      if (a.x > b.x) {
+        swap_pointers(&a, &b);
+        swap_pointers(&uv_a, &uv_b);
+      }
 
       int x0 = a.x;
       int x1 = b.x;
@@ -97,10 +115,14 @@ internal void Triangle(v3i *p, u32 color, int *z_buffer) {
         r32 share =
             (b.x == a.x) ? 1.0f : static_cast<r32>(x - a.x) / (b.x - a.x);
         v3i result = a + share * (b - a);
+        v2i uv_result = uv_a + share * (uv_b - uv_a);
+
         int index = result.y * g_game_backbuffer.width + result.x;
         if (z_buffer[index] < result.z) {
           z_buffer[index] = result.z;
-          *Pixel = color;
+          TGAColor color = texture->get(uv_result.x, uv_result.y);
+          *Pixel = (u32)(color.r * intensity) << 16 |
+                   (u32)(color.g * intensity) << 8 | (u32)(color.b * intensity);
         }
         Pixel++;
       }
@@ -116,7 +138,7 @@ internal void DebugTriangle(v2i *p0, v2i *p1, v2i *p2, u32 color) {
 
 internal void LoadModelFromFile(char *filename, char *texture_filename) {
   // Load texture
-  g_model.texture = (TGAImage *) new TGAImage();
+  g_model.texture = (TGAImage *)new TGAImage();
   g_model.texture->read_tga_file(texture_filename);
   g_model.texture->flip_vertically();
 
@@ -216,8 +238,6 @@ internal void Render() {
       vert[j] = g_model.vertices[face->v[j] - 1];
     }
 
-    // TODO: load texture coordinates, pass them on to the triangle
-
     v3 normal = Normalize(CrossProduct(vert[2] - vert[0], vert[1] - vert[0]));
     r32 intensity = DotProduct(normal, light_direction);
     if (intensity <= 0) continue;
@@ -229,7 +249,12 @@ internal void Render() {
       }
     }
 
-    Triangle(p, GetGrayColor(intensity), g_game_backbuffer.z_buffer);
+    v2i uv[3];
+    for (int j = 0; j < 3; ++j) {
+      uv[j] = g_model.texture_coords[face->uvs[j] - 1];
+    }
+
+    Triangle(p, uv, intensity, g_model.texture, g_game_backbuffer.z_buffer);
   }
 
   // u32 color = 0x00AAAAAA;
